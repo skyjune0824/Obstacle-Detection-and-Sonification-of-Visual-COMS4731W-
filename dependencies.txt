@@ -3,3 +3,4 @@ kagglehub
 numpy 
 matplotlib
 h5py
+pandas

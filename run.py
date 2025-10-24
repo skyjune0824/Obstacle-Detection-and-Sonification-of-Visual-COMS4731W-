@@ -1,7 +1,8 @@
 import sys
 import os
 import argparse
-from preprocess.data_management import download_dataset, DOWNLOAD_DIR
+from preprocess.data_management import download_dataset, save_raw_h5_file_paths
+from config import RAW_CSV_PATH, DOWNLOAD_DIR
 
 def parse_arguments():
     """
@@ -23,7 +24,14 @@ def parse_arguments():
     parser.add_argument(
         '-f', '--force',
         action='store_true',
-        help="Forcefully redownload dataset from kaggle. (Default: False)"
+        help="Do action forcefully. (Default: False)"
+    )
+
+    # -lp, --load_path: create path cache csv
+    parser.add_argument(
+        '-lp', '--load_path',
+        action='store_true',
+        help="Create and load path cache csv file."
     )
 
     return parser.parse_args()
@@ -50,8 +58,19 @@ def main():
 
         print(f"Dataset is ready at '{dataset_path}'.")
 
+    if args.load_path:
+        print ("\nStarting path creation")
 
+        csv_paths = save_raw_h5_file_paths(
+            force_rebuild=args.force
+        )
 
+        if not csv_paths:
+            print("\nError occured, system terminating...")
+            sys.exit(1)
+
+        print(f"\nDataset load ready.")
+        print(f"Path file available at '{csv_paths}'")
 
 if __name__ == "__main__":
     main()

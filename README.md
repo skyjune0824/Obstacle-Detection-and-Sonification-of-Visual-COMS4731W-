@@ -36,3 +36,12 @@ You must activate the virtual environment before running any Python scripts:
 | :--- | :--- |
 | **Linux / macOS (Bash)** | `source cvproject/bin/activate` |
 | **Windows (CMD/PowerShell)** | `.\cvproject\Scripts\activate` |
+
+## Usage
+
+- All the functionalities are supported by `run.py`. via flags.
+  - `-h`, `--help`: help
+  - `-d`, `--download`: download data
+    - `-f`, `--force`: forcefully redownload the data
+  - `-lp`, `--load_path`: create path caches
+    - `-f`, `--force`: recreate csv files and overwrites it
