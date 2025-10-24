@@ -2,3 +2,4 @@ kaggle
 kagglehub
 numpy 
 matplotlib
+h5py

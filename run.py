@@ -1,7 +1,7 @@
 import sys
 import os
 import argparse
-from preprocess.data_management import download_dataset
+from preprocess.data_management import download_dataset, DOWNLOAD_DIR
 
 def parse_arguments():
     """
@@ -41,7 +41,8 @@ def main():
         if args.force:
             print("\nOverwrite exsisting data...")
 
-        dataset_path = download_dataset(force=args.force)
+        # dataset_path = download_dataset(force=args.force)
+        dataset_path = DOWNLOAD_DIR # above not working, manually download to the data folder
 
         if dataset_path is None:
             print("\nError occured, system terminating...")
