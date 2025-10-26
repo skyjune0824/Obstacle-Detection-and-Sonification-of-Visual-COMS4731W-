@@ -1,0 +1,3 @@
+[submodule "models/Depth-Anything-V2"]
+	path = models/Depth-Anything-V2
+	url = https://github.com/DepthAnything/Depth-Anything-V2
