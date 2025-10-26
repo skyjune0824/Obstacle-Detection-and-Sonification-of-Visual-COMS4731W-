@@ -2,6 +2,7 @@
 
 ENV_NAME="cvproject"
 DEP_LIST="dependencies.txt"
+DEPTHANYTHING_PATH="models/Depth-Anything-V2"
 
 PYTHON_CMD="python"
 
@@ -39,4 +40,24 @@ if [ -f "$DEP_LIST" ]; then
 else
     echo "Cannot find $DEP_LIST file. Installation skipped."
     echo "Environment created."
+fi
+
+"pwd"
+"ls"
+
+if [ -d "$DEPTHANYTHING_PATH" ]; then
+    DA_REQ="$DEPTHANYTHING_PATH/requirements.txt"
+
+    if [ -f "$DA_REQ" ]; then
+        echo ">>> Installing Depth Anything V2 dependencies..."
+        "$PIP_PATH" install -r "$DA_REQ" || {
+            echo "ERROR: Failed to install Depth Anything V2 dependencies."
+            exit 1
+        }
+
+    else
+        echo "WARNING: Depth Anything V2 requirements.txt not found — skipping."
+    fi
+else
+    echo "WARNING: Depth Anything V2 folder not found at $DEPTHANYTHING_PATH — skipping."
 fi
