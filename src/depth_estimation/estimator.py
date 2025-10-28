@@ -7,20 +7,26 @@
 # We could in theory take up to 30 images per second.
 # Because Depth Anything V2 is supported by CoreML and we are considering a mobile implementation, we will use this model.
 
-import coremltools as ct
-import numpy as np
+from transformers import pipeline
 from PIL import Image
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-# Load model
-model = ct.models.MLModel("./models/DepthAnythingV2SmallF16.mlpackage")
+pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Small-hf")
 
-# Pre-process image to match model spec
-img = Image.open("src/depth_estimation/test_image.jpg").convert("RGB")
-img = img.resize((518, 518))  # or whatever size the model expects
-img_np = np.array(img).astype(np.float32) / 255.0
-# Possibly transpose to CHW or whatever the model expects
-img_np = np.transpose(img_np, (2, 0, 1))[None, ...]
+img = Image.open("test_image.jpg")
+out = pipe(img)
+depth_map = np.array(out["depth"])
 
-# Run prediction
-out = model.predict({"image": img_np})  # key = input name
-depth_map = out["depth"]  # key = output name
+plt.imshow(depth_map, cmap="magma")
+plt.colorbar()
+plt.show()
+
+# Output to file
+depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
+depth_img.save("depth_map.png")
+
+# (Optional) save raw float data
+np.save("depth_map.npy", depth_map)
