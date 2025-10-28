@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image
 
 # Load model
-model = ct.models.MLModel("DepthAnythingV2SmallF16.mlpackage")
+model = ct.models.MLModel("./models/DepthAnythingV2SmallF16.mlpackage")
 
 # Pre-process image to match model spec
 img = Image.open("src/depth_estimation/test_image.jpg").convert("RGB")
