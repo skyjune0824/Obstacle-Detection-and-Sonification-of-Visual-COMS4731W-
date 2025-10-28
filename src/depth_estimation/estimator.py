@@ -11,13 +11,19 @@ from transformers import pipeline
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-import os
+import time
+
+start = time.time()
 
 pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Small-hf")
 
 img = Image.open("test_image.jpg")
 out = pipe(img)
 depth_map = np.array(out["depth"])
+
+end = time.time()
+
+print(f"Inference took {end - start:.3f} seconds")
 
 plt.imshow(depth_map, cmap="magma")
 plt.colorbar()
