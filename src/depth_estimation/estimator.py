@@ -7,39 +7,20 @@
 # We could in theory take up to 30 images per second.
 # Because Depth Anything V2 is supported by CoreML and we are considering a mobile implementation, we will use this model.
 
-# Path Import for Depth Anything Model
-from pathlib import Path
-import sys
+import coremltools as ct
+import numpy as np
+from PIL import Image
 
-current_file = Path(__file__)
-project_root = current_file.parent.parent.parent
-da_path = project_root / "models" / "Depth-Anything-V2"
-sys.path.insert(0, str(da_path))
+# Load model
+model = ct.models.MLModel("DepthAnythingV2SmallF16.mlpackage")
 
-print(da_path / "checkpoints" / "depth_anything_v2_")
+# Pre-process image to match model spec
+img = Image.open("src/depth_estimation/test_image.jpg").convert("RGB")
+img = img.resize((518, 518))  # or whatever size the model expects
+img_np = np.array(img).astype(np.float32) / 255.0
+# Possibly transpose to CHW or whatever the model expects
+img_np = np.transpose(img_np, (2, 0, 1))[None, ...]
 
-import cv2
-import torch
-
-from depth_anything_v2.dpt import DepthAnythingV2
-
-DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
-
-model_configs = {
-    'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
-    'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
-    'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
-    'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]}
-}
-
-encoder = 'vits' # or 'vits', 'vitb', 'vitg'
-
-model = DepthAnythingV2(**model_configs[encoder])
-
-WEIGHT_PATH = da_path / "checkpoints" / f"depth_anything_v2_{encoder}.pth"
-
-model.load_state_dict(torch.load(str(WEIGHT_PATH), map_location='cpu'))
-model = model.to(DEVICE).eval()
-
-raw_img = cv2.imread('your/image/path')
-depth = model.infer_image(raw_img) # HxW raw depth map in numpy
+# Run prediction
+out = model.predict({"image": img_np})  # key = input name
+depth_map = out["depth"]  # key = output name
