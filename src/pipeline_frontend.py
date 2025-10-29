@@ -29,7 +29,7 @@ def test_output(depth_map, output_dir):
     depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
 
     # Return for testing.
-    cv2.imwrite(depth_img, output_dir)
+    depth_img.save(output_dir)
 
 
 def sample_frames(video_path, output_dir):
