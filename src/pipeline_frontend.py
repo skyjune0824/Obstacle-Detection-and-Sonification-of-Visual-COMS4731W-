@@ -30,7 +30,7 @@ def test_output(depth_map, output_dir, name):
 
     # Return for testing.
     output_path = os.path.join(output_dir, name)
-    cv2.imwrite(output_path, depth_img)
+    depth_img.save(output_path)
 
 
 def sample_frames(video_path, output_dir):
