@@ -67,11 +67,13 @@ def sample_frames(video_path, output_dir):
             # Preprocess
             frame = preprocess(frame, saved_count)
 
-            # DEBUG
-            print("IMG TYPE: ", type(frame))
-
+            infer_start = time.time()
             # MDE Estimation
             mapping = model.infer_depth(frame)
+
+            infer_end = time.time()
+
+            print(f"Inference step {saved_count} = {infer_end - infer_start} s.")
 
             # Return
             test_output(mapping, output_dir, f"map_{saved_count:05d}.jpg")
