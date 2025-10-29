@@ -8,8 +8,8 @@
 # Because Depth Anything V2 is supported by CoreML and we are considering a mobile implementation, we will use this model.
 
 from transformers import pipeline
-from PIL import Image
 import matplotlib.pyplot as plt
+from PIL import Image
 import numpy as np
 import time
 
