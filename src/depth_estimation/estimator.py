@@ -9,30 +9,13 @@
 
 from transformers import pipeline
 import matplotlib.pyplot as plt
-from PIL import Image
 import numpy as np
-import time
 
-start = time.time()
 
-pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Small-hf")
+class MDE:
+    def __init__(self):
+        self.pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Small-hf")
 
-img = Image.open("test_image.jpg")
-out = pipe(img)
-depth_map = np.array(out["depth"])
+    def infer_depth(self, frame):
+        return self.pipe(frame)
 
-end = time.time()
-
-print(f"Inference took {end - start:.3f} seconds")
-
-plt.imshow(depth_map, cmap="magma")
-plt.colorbar()
-plt.show()
-
-# Output to file
-depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
-depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
-depth_img.save("depth_map.png")
-
-# (Optional) save raw float data
-np.save("depth_map.npy", depth_map)

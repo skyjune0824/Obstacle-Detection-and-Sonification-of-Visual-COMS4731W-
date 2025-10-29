@@ -1,8 +1,11 @@
-import depth_estimation.estimator
+from depth_estimation.estimator import MDE
+from PIL import Image
 import cv2
 import os
+import time
 
-def preprocess(frame, saved_count, output_dir):
+
+def preprocess(frame, saved_count):
     """
     Processes frame for depth estimation.
 
@@ -15,6 +18,14 @@ def preprocess(frame, saved_count, output_dir):
 
     # Output file
     return image_rotated
+
+def test_output(depth_map, output_dir):
+    # Normalize
+    depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+    depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
+
+    # Return for testing.
+    cv2.imwrite(depth_img, output_dir)
 
 
 def sample_frames(video_path, output_dir):
@@ -32,9 +43,15 @@ def sample_frames(video_path, output_dir):
         print(f"Error: Could not open video file {video_path}")
         return
     
+    # Initialize MDE Model
+    model = MDE()
+    
     frame_count = 0
     saved_count = 0
     frame_interval = 30
+
+    # Time
+    start = time.time()
 
     while True:
         ret, frame = cap.read()
@@ -43,17 +60,22 @@ def sample_frames(video_path, output_dir):
 
         if frame_count % frame_interval == 0:
             # Preprocess
-            frame = preprocess(frame, saved_count, output_dir)
+            frame = preprocess(frame, saved_count)
 
             # MDE Estimation
+            mapping = model.infer_depth(frame)
 
+            # Return
+            test_output(mapping, output_dir)
 
             saved_count += 1
         
         frame_count += 1
 
+    end = time.time()
+
     cap.release()
-    print(f"Finished sampling. Saved {saved_count} frames to '{output_dir}'.")
+    print(f"Finished sampling. Saved {saved_count} frames to '{output_dir}' in {end - start} s.")
 
 if __name__ == "__main__":
     # Hard coded simple paths for my own testing currently.
