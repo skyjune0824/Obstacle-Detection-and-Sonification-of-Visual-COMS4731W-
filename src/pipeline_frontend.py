@@ -12,12 +12,15 @@ def preprocess(frame, saved_count):
     """
 
     # Rotate image 90 degrees (Vertical phone image)
-    image_rotated = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)    
+    image_rotated = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE) 
+
+    # Convert to PIL format
+    pil_img = Image.fromarray(image_rotated)   
 
     # Further preprocessing as needed...
 
     # Output file
-    return image_rotated
+    return pil_img
 
 def test_output(depth_map, output_dir):
     # Normalize
@@ -61,6 +64,9 @@ def sample_frames(video_path, output_dir):
         if frame_count % frame_interval == 0:
             # Preprocess
             frame = preprocess(frame, saved_count)
+
+            # DEBUG
+            print("IMG TYPE: ", type(frame))
 
             # MDE Estimation
             mapping = model.infer_depth(frame)
