@@ -23,13 +23,14 @@ def preprocess(frame, saved_count):
     # Output file
     return pil_img
 
-def test_output(depth_map, output_dir):
+def test_output(depth_map, output_dir, name):
     # Normalize
     depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
     depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
 
     # Return for testing.
-    depth_img.save(output_dir)
+    output_path = os.path.join(output_dir, name)
+    cv2.imwrite(output_path, depth_img)
 
 
 def sample_frames(video_path, output_dir):
@@ -73,7 +74,7 @@ def sample_frames(video_path, output_dir):
             mapping = model.infer_depth(frame)
 
             # Return
-            test_output(mapping, output_dir)
+            test_output(mapping, output_dir, f"map_{saved_count:05d}.jpg")
 
             saved_count += 1
         
