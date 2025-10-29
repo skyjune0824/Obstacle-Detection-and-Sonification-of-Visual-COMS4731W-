@@ -17,5 +17,7 @@ class MDE:
         self.pipe = pipeline(task="depth-estimation", model="depth-anything/Depth-Anything-V2-Small-hf")
 
     def infer_depth(self, frame):
-        return self.pipe(frame)
+        output = self.pipe(frame)
+        return np.array(output["depth"])
+
 
