@@ -1,5 +1,6 @@
 from depth_estimation.estimator import MDE
 from PIL import Image
+import numpy as np
 import cv2
 import os
 import time
