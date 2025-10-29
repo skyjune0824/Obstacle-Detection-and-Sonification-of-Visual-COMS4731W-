@@ -1,6 +1,22 @@
 import cv2
 import os
 
+def preprocess(frame, saved_count, output_dir):
+    """
+    Processes frame for depth estimation.
+
+    """
+
+    # Rotate image 90 degrees (Vertical phone image)
+    image_rotated = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+
+    # Output file
+    frame_filename = f"frame_{saved_count:05d}.jpg"
+    output_path = os.path.join(output_dir, frame_filename)
+    cv2.imwrite(output_path, image_rotated)
+
+
+
 def sample_frames(video_path, output_dir):
     """
     Samples frames from video input for depth detection.
@@ -26,9 +42,7 @@ def sample_frames(video_path, output_dir):
             break
 
         if frame_count % frame_interval == 0:
-            frame_filename = f"frame_{saved_count:05d}.jpg"
-            output_path = os.path.join(output_dir, frame_filename)
-            cv2.imwrite(output_path, frame)
+            preprocess(frame, saved_count, output_dir)
             saved_count += 1
         
         frame_count += 1
