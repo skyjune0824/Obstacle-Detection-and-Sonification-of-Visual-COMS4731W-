@@ -1,5 +1,6 @@
 from depth_estimation.estimator import MDE
 from PIL import Image
+import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 import os
@@ -53,7 +54,17 @@ def sample_frames(video_path, output_dir):
     
     frame_count = 0
     saved_count = 0
-    frame_interval = 30
+    
+    # Get FPS
+    # fps = cap.get(cv2.CAP_PROP_FPS)
+    # if fps <= 0:
+    #     fps = 30  # fallback
+    # frame_interval = int(fps / 30) if fps > 30 else 1
+
+    frame_interval = 2
+
+    # Store Inference Times
+    times = []
 
     # Time
     start = time.time()
@@ -75,6 +86,8 @@ def sample_frames(video_path, output_dir):
 
             print(f"Inference step {saved_count} = {infer_end - infer_start} s.")
 
+            times.append(infer_end - infer_start)
+
             # Return
             test_output(mapping, output_dir, f"map_{saved_count:05d}.jpg")
 
@@ -87,8 +100,25 @@ def sample_frames(video_path, output_dir):
     cap.release()
     print(f"Finished sampling. Saved {saved_count} frames to '{output_dir}' in {end - start} s.")
 
+    # Plot Times
+    x = np.arange(saved_count)
+    y = np.array(times)
+
+    mean_value = np.mean(times)
+    plt.axhline(mean_value, color='red', linestyle='--', label=f"Mean = {mean_value:.2f}s")
+    
+    plt.plot(x, y)
+
+    plt.xlabel("Frame")
+    plt.ylabel("Time (s)")
+    plt.title("Inference Time Per Frame")
+    plt.legend()
+
+    plt.show()
+
+
 if __name__ == "__main__":
     # Hard coded simple paths for my own testing currently.
     input_video = "/Users/christianscaff/Documents/Academics/Columbia/Fall_25/COMS_4731/Project/Data/IMG_2200.MOV"
-    output_folder = "/Users/christianscaff/Documents/Academics/Columbia/Fall_25/COMS_4731/Project"
+    output_folder = "/Users/christianscaff/Documents/Academics/Columbia/Fall_25/COMS_4731/Project/Result"
     sample_frames(input_video, output_folder)
