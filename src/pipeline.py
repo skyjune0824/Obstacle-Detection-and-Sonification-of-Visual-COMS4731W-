@@ -23,6 +23,10 @@ def preprocess(frame):
     return pil_img
 
 def output_map(depth_map, output_dir, name):
+    """
+    Outputs depth map as an image for debugging.
+    
+    """
     # Normalize depth values
     depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
     depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
