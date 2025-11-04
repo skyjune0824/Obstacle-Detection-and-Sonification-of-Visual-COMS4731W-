@@ -1,7 +1,8 @@
 import sys
 import os
 import argparse
-from preprocess.data_management import download_dataset, save_raw_h5_file_paths
+from src.preprocess.data_management import download_dataset, save_raw_h5_file_paths
+from src.pipeline import pipeline
 from config import RAW_CSV_PATH, DOWNLOAD_DIR
 
 def parse_arguments():

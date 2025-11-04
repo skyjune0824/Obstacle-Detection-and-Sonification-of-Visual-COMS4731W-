@@ -10,12 +10,9 @@ def preprocess(frame):
     Processes frame for depth estimation.
 
     """
-
-    # Rotate image 90 degrees (Vertical phone image)
-    image_rotated = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE) 
-
+    
     # Convert to PIL format
-    pil_img = Image.fromarray(image_rotated)   
+    pil_img = Image.fromarray(frame)
 
     # Further preprocessing as needed...
 
@@ -27,6 +24,7 @@ def output_map(depth_map, output_dir, name):
     Outputs depth map as an image for debugging.
     
     """
+
     # Normalize depth values
     depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
     depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
@@ -106,3 +104,7 @@ def pipeline(video_signal=None, output_dir=None, sampling_rate=2, debug=False):
 
     cap.release()
     print(f"Finished Processing.")
+
+if __name__ == "__main__":
+    # Example call for testing
+    pipeline(video_signal=0, output_dir="../test/debug_output", sampling_rate=2, debug=True)
