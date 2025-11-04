@@ -19,5 +19,3 @@ class MDE:
     def infer_depth(self, frame):
         output = self.pipe(frame)
         return np.array(output["depth"])
-
-
