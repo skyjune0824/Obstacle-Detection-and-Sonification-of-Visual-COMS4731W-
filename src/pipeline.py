@@ -106,4 +106,3 @@ def pipeline(video_signal=None, output_dir=None, sampling_rate=2, debug=False):
 
     cap.release()
     print(f"Finished Processing.")
-
