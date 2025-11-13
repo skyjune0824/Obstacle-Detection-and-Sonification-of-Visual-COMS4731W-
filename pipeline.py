@@ -1,4 +1,5 @@
-from depth_estimation.estimator import MDE
+from modules.depth_estimator import MDE
+from modules.depth2visualize import depth2ad
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
@@ -25,10 +26,9 @@ def output_map(depth_map, output_dir, name):
     
     """
 
-
-    with open('mapping_test.txt', 'w') as f:
-        for item in depth_map:
-            f.write(str(item) + '\n')
+    # with open('mapping_test.txt', 'w') as f:
+    #     for item in depth_map:
+    #         f.write(str(item) + '\n')
 
     # # Normalize depth values
     # depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
@@ -104,6 +104,8 @@ def pipeline(video_signal=None, output_dir=None, sampling_rate=2, debug=False):
             # Output Debugging
             if debug and output_dir is not None:
                 output_map(mapping, output_dir, f"map_{frame_count:05d}.jpg")
+
+            result_array = depth2ad(mapping, debug = debug)
         
         frame_count += 1
 

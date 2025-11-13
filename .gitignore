@@ -1,3 +1,5 @@
 /cvproject
 /data
 /test
+*.pyc
+__pycache__
