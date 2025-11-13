@@ -4,4 +4,3 @@ numpy
 matplotlib
 h5py
 pandas
-open3d
