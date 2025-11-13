@@ -25,13 +25,18 @@ def output_map(depth_map, output_dir, name):
     
     """
 
-    # Normalize depth values
-    depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
-    depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
 
-    # Return.
-    output_path = os.path.join(output_dir, name)
-    depth_img.save(output_path)
+    with open('mapping_test.txt', 'w') as f:
+        for item in depth_map:
+            f.write(str(item) + '\n')
+
+    # # Normalize depth values
+    # depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+    # depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
+
+    # # Return.
+    # output_path = os.path.join(output_dir, name)
+    # depth_img.save(output_path)
 
 
 def pipeline(video_signal=None, output_dir=None, sampling_rate=2, debug=False):
@@ -101,6 +106,8 @@ def pipeline(video_signal=None, output_dir=None, sampling_rate=2, debug=False):
                 output_map(mapping, output_dir, f"map_{frame_count:05d}.jpg")
         
         frame_count += 1
+
+        break
 
     cap.release()
     print(f"Finished Processing.")
