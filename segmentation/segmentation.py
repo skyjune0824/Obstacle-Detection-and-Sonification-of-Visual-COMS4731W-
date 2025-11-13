@@ -313,7 +313,7 @@ def main():
         grid_size=(100, 100)   # 10m x 10m grid
     )
     
-    # Example: Process depth maps from your teammate's model
+    # Example: Process depth maps
     # Replace this with actual depth map source
     cap = cv2.VideoCapture(0)  # Or video file path
     
@@ -322,7 +322,7 @@ def main():
         if not ret:
             break
         
-        # TODO: Get depth map from your teammate's depth estimation model
+        # TODO: Get depth map
         # depth_map = depth_estimation_model.predict(rgb_frame)
         # For demo purposes, create dummy depth map
         depth_map = np.random.rand(*rgb_frame.shape[:2]) * 3.0  # Simulated depth

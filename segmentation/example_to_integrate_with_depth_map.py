@@ -6,7 +6,7 @@ def integrate_with_depth_model():
     """
     Example showing how to connect with depth estimation output
     """
-    # Initialize your teammate's depth model
+    # Intialize Depth Map
     # Example with Depth Anything V2
     # depth_model = torch.hub.load('depth-anything/Depth-Anything-V2', 'vitl')
     
