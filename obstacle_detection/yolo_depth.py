@@ -22,3 +22,21 @@ class DualPathwayYOLO(nn.Module):
         fused_features = torch.cat((features_rgb, features_depth), dim=1)
         
         return fused_features
+
+
+# Replace RealSense depth acquisition with your depth estimation
+import cv2
+import numpy as np
+
+# Load your RGB frame
+rgb_frame = cv2.imread('your_image.jpg')
+
+# Load your monocular depth map (from Depth Anything V2)
+depth_map = np.load('your_depth_map.npy')  # or load from your pipeline
+
+# Normalize depth to match expected format
+depth_normalized = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX)
+depth_normalized = depth_normalized.astype(np.uint8)
+
+# Concatenate for 4-channel input
+rgbd_input = np.concatenate([rgb_frame, depth_normalized[:,:,np.newaxis]], axis=2)
