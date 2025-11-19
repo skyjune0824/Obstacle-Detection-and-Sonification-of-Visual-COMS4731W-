@@ -1,7 +1,7 @@
 import argparse
 
 # MDE Pipeline
-from src.MDE.pipeline import monocular_depth_estimation_pipeline
+from src.MDE.pipeline import MDE_Pipeline
 
 def structure_from_motion_pipeline(source):
     """
@@ -39,7 +39,11 @@ def main():
 
     # Test
     if args.mde:
-        monocular_depth_estimation_pipeline(args.input_video)
+        # Initialize Pipeline
+        MDE = MDE_Pipeline(rate = 4)
+
+        # Call Pipeline
+        MDE.pipeline(args.input_video)
     elif args.sfm:
         structure_from_motion_pipeline(args.input_video)
 

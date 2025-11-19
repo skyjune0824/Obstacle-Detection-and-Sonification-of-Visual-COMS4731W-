@@ -2,7 +2,7 @@
 import cv2
 
 # Modules
-from MDE.estimator import MDE
+from src.MDE.estimator import MDE
 from src.Segmentation.segmentation import SegmentationModule
 
 class MDE_Pipeline:
@@ -13,9 +13,13 @@ class MDE_Pipeline:
     segmentation, and spatial audio synthesis.
     """
 
-    def __init__(self, model, segmenter, rate):
-        self.model = model
-        self.segmenter = segmenter
+    def __init__(self, rate):
+        self.model = MDE()
+        self.segmenter = SegmentationModule(
+                            depth_threshold=2.5,
+                            grid_resolution=0.1,
+                            grid_size=(100, 100)
+                        )
         self.sample_rate = rate
 
 
