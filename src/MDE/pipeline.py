@@ -1,6 +1,9 @@
 # Video Processing
 import cv2
 
+# Image Processing
+from PIL import Image
+
 # Modules
 from src.MDE.estimator import MDE
 from src.Segmentation.segmentation import SegmentationModule
@@ -33,7 +36,7 @@ class MDE_Pipeline:
         """
 
         # Debug Print
-        print(f"Performing MDE on video located at: {source}")
+        print(f"Running MDE -> Spatial Audio Pipeline...")
 
         # Open Video Path
         cap = cv2.VideoCapture(source)
@@ -46,35 +49,41 @@ class MDE_Pipeline:
 
         # Core Pipeline Loop
         while True:
-            print(f"Running MDE -> Spatial Audio Pipeline...")
-
             # Read Frame While Possible
             ret, frame = cap.read()
             if not ret:
                 break
 
-            # Sample and Process Frame In multiples of "Sample Rate". 
-            if frame_cnt % self.sampling_rate == 0:
-                process(frame)
-                frame_cnt += 1
+            # Sample and Process Frame in multiples of "Sample Rate". 
+            if frame_cnt % self.sample_rate == 0:
+                self.process(frame)
+
+            # Increment Frame Count
+            frame_cnt += 1
             
-            # Release Video Source
-            cap.release()
+        # Release Video Source
+        cap.release()
+
+        print("Complete.")
 
         return NotImplemented
 
 
-def process(self, frame):
-    """
-    Process
-    Denotes one singular pass in the pipeline.
-    1. Captures Depth Map
-    2. Segments Depth Map and creates BEV.
-    3. Synthesizes into Spatial Audio.
-    
-    """
-    # MDE Estimation
-    mapping = self.model.infer_depth(frame)
+    def process(self, frame):
+        """
+        Process
+        Denotes one singular pass in the pipeline.
+        1. Captures Depth Map
+        2. Segments Depth Map and creates BEV.
+        3. Synthesizes into Spatial Audio.
+        
+        """
 
-    # Segment
-    seg_results = self.segmenter.process_depth_map(mapping)
+        # Preprocess
+        pil_img = Image.fromarray(frame)
+
+        # MDE Estimation
+        mapping = self.model.infer_depth(pil_img)
+
+        # Segment
+        seg_results = self.segmenter.process_depth_map(mapping)
