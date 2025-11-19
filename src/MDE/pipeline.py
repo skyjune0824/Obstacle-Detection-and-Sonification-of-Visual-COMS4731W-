@@ -89,6 +89,10 @@ class MDE_Pipeline:
         # MDE Estimation
         mapping = self.model.infer_depth(pil_img)
 
+        # Debugging Visualization
+        if DEBUG:
+            visualize_depth(mapping)
+
         # Segment
         seg_results = self.segmenter.process_depth_map(mapping)
 
@@ -107,6 +111,5 @@ def visualize_depth(depth_map):
     depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
 
     # Display Depth Map
-    cv2.imshow("Live Feed", depth_img)
-    cv2.waitKey(1000)
-    cv2.destroyAllWindows()
+    depth_img.show()
+    
