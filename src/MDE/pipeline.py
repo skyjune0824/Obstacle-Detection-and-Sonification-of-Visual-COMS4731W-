@@ -1,3 +1,6 @@
+# Debug Setting
+from config import DEBUG
+
 # Video Processing
 import cv2
 
@@ -36,7 +39,7 @@ class MDE_Pipeline:
         """
 
         # Debug Print
-        print(f"Running MDE -> Spatial Audio Pipeline...")
+        log(f"Running MDE -> Spatial Audio Pipeline...")
 
         # Open Video Path
         cap = cv2.VideoCapture(source)
@@ -64,7 +67,7 @@ class MDE_Pipeline:
         # Release Video Source
         cap.release()
 
-        print("Complete.")
+        log("Complete.")
 
         return NotImplemented
 
@@ -87,3 +90,7 @@ class MDE_Pipeline:
 
         # Segment
         seg_results = self.segmenter.process_depth_map(mapping)
+
+def log(msg):
+    if DEBUG:
+        print(msg)
