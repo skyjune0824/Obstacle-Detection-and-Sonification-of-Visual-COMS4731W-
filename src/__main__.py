@@ -3,7 +3,7 @@ import argparse
 # MDE Pipeline
 from src.MDE.pipeline import monocular_depth_estimation_pipeline
 
-def structure_from_motion_pipeline(source, debug: bool):
+def structure_from_motion_pipeline(source):
     """
     The following function marks the pipeline for creating a minimal point cloud
     from multiple images in motion, performing segmentation, and synthesizing spatial audio.
@@ -13,8 +13,7 @@ def structure_from_motion_pipeline(source, debug: bool):
 
     """
 
-    if debug: 
-        print(f"Performing SFM on video located at: {source}")
+    print(f"Performing SFM on video located at: {source}")
 
     return NotImplemented
 
@@ -36,19 +35,13 @@ def main():
         help="Structure From Motion -> Spatial Audio",
     )
 
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Show Verbose",
-    )
-
     args = parser.parse_args()
 
     # Test
     if args.mde:
-        monocular_depth_estimation_pipeline(args.input_video, args.debug)
+        monocular_depth_estimation_pipeline(args.input_video)
     elif args.sfm:
-        structure_from_motion_pipeline(args.input_video, args.debug)
+        structure_from_motion_pipeline(args.input_video)
 
 if __name__ == "__main__":
     main()
