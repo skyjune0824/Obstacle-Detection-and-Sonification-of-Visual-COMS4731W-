@@ -2,20 +2,7 @@ import argparse
 
 # MDE Pipeline
 from src.MDE.pipeline import MDE_Pipeline
-
-def structure_from_motion_pipeline(source):
-    """
-    The following function marks the pipeline for creating a minimal point cloud
-    from multiple images in motion, performing segmentation, and synthesizing spatial audio.
-
-    Source: Path to video we desire to perform our pipeline on.
-    Debug: Toggles Verbose
-
-    """
-
-    print(f"Performing SFM on video located at: {source}")
-
-    return NotImplemented
+from src.SFM.pipeline import SFM_Pipeline
 
 def main():
     # Initialize Arguments
@@ -45,7 +32,11 @@ def main():
         # Call Pipeline
         MDE.pipeline(args.input_video)
     elif args.sfm:
-        structure_from_motion_pipeline(args.input_video)
+        # Initialize Pipeline
+        SFM = SFM_Pipeline()
+
+        # Call Pipeline
+        SFM.pipeline(args.input_video)
 
 if __name__ == "__main__":
     main()
