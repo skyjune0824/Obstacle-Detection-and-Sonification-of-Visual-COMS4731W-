@@ -1,19 +1,7 @@
 import argparse
 
-def monocular_depth_estimation_pipeline(source, debug: bool):
-    """
-    The following function marks the pipeline for estimating a depth map,
-    performing segmentation, and synthesizing spatial audio. 
-
-    Source: Path to video we desire to perform our pipeline on.
-    Debug: Toggles Verbose
-    
-    """
-
-    # DEBUG
-    print(f"MDE Path: {source}")
-
-    return NotImplemented
+# MDE Pipeline
+from src.MDE.pipeline import monocular_depth_estimation_pipeline
 
 def structure_from_motion_pipeline(source, debug: bool):
     """
@@ -22,11 +10,11 @@ def structure_from_motion_pipeline(source, debug: bool):
 
     Source: Path to video we desire to perform our pipeline on.
     Debug: Toggles Verbose
-     
+
     """
 
-    # DEBUG
-    print(f"SFM Path: {source}")
+    if debug: 
+        print(f"Performing SFM on video located at: {source}")
 
     return NotImplemented
 
