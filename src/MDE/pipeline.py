@@ -6,6 +6,7 @@ import cv2
 
 # Image Processing
 from PIL import Image
+import numpy as np
 
 # Modules
 from src.MDE.estimator import MDE
@@ -94,3 +95,18 @@ class MDE_Pipeline:
 def log(msg):
     if DEBUG:
         print(msg)
+
+def visualize_depth(depth_map):
+    """
+    Visualize Depth
+
+    Used for debugging depth map output of sampled frame.
+    """
+    # Normalize depth values
+    depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+    depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
+
+    # Display Depth Map
+    cv2.imshow("Live Feed", depth_img)
+    cv2.waitKey(1000)
+    cv2.destroyAllWindows()
