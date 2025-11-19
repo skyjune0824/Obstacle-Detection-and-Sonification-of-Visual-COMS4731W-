@@ -3,7 +3,7 @@
 ENV_NAME="cvproject"
 DEP_LIST="dependencies.txt"
 
-PYTHON_CMD="python"
+PYTHON_CMD="python3"
 
 echo "ENV '$ENV_NAME' creating..."
 $PYTHON_CMD -m venv $ENV_NAME
