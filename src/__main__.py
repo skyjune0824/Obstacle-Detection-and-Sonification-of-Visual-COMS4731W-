@@ -27,7 +27,7 @@ def main():
     # Test
     if args.mde:
         # Initialize Pipeline
-        MDE = MDE_Pipeline(rate = 4)
+        MDE = MDE_Pipeline(rate = 40)
 
         # Call Pipeline
         MDE.pipeline(args.input_video)
