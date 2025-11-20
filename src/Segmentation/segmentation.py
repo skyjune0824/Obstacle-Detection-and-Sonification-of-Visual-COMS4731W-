@@ -176,6 +176,43 @@ class SegmentationModule:
         
         return grid
     
+    def occupancy_grid_to_zones(self, occupancy_grid):
+        """
+        Convert occupancy grid to left/center/right zones for audio mapping.
+        """
+
+        grid_z, grid_x = occupancy_grid.shape
+        zone_width = grid_x // 3
+        zones = {}
+
+        for i, zone in enumerate(['left', 'center', 'right']):
+            start_col = i * zone_width
+            end_col = (i + 1) * zone_width if i < 2 else grid_x
+            
+            # Get Z obstacles within specific range.
+            zone_grid = occupancy_grid[:, start_col:end_col]
+            
+            # Count occupied cells
+            occupied = np.sum(zone_grid > 0)
+            density = occupied / zone_grid.size
+            
+            # Find the nearest occupied row for Closest Distance
+            occupied_rows = np.where(np.any(zone_grid > 0, axis=1))[0]
+            if len(occupied_rows) > 0:
+                # Converts row index back to relative distance based on the grid resolution.
+                min_distance = occupied_rows[0] * self.grid_resolution
+            else:
+                # No occupied rows
+                min_distance = float('inf')
+            
+            zones[zone] = {
+                'min_distance': min_distance,
+                'obstacle_density': density
+            }
+        
+        return zones
+
+    
     def detect_moving_obstacles(self, depth_map):
         """
         Detect moving obstacles using temporal depth difference and optical flow

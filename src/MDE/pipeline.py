@@ -10,7 +10,6 @@ import numpy as np
 
 # Modules
 from src.MDE.estimator import MDE
-from old.depth2visualize import depth2ad
 from src.Segmentation.segmentation import SegmentationModule
 from src.AudioSynthesis.synthesize import AudioSynthesis
 
