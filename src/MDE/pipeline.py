@@ -90,6 +90,12 @@ class MDE_Pipeline:
         # Segment
         seg_results = self.segmenter.process_depth_map(mapping)
 
+        # DEBUGGING 
+        print(seg_results["zones"])
+
+        # Synthesize Audio
+
+
         # Debugging Visualization
         if DEBUG:
             self.visualize_depth(mapping, seg_results, frame)

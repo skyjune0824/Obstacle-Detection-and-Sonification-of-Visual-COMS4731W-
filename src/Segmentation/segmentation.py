@@ -155,8 +155,6 @@ class SegmentationModule:
                 if obstacle_mask[y, x] > 0 and depth_map[y, x] > 0:
                     depth = depth_map[y, x]
 
-                    print(f"DEPTH: {depth}")
-
                     # Clamp Minimum Depth
                     depth = np.maximum(depth, min_depth)
                     
@@ -173,6 +171,8 @@ class SegmentationModule:
                     # Mark grid cell as occupied if within bounds
                     if 0 <= grid_x < self.grid_size[1] and 0 <= grid_z < self.grid_size[0]:
                         grid[grid_z, grid_x] = 255
+                        # print(f"X: {grid_x}, Z: {grid_z}")
+
         
         return grid
     
