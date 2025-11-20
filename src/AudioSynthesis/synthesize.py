@@ -58,9 +58,9 @@ class AudioSynthesis:
             density = data["obstacle_density"]
 
             # Zero Obstacles = No Audible Frequency
-            if min_dist == float('inf'):
-                freq = 0
-                vol = 0
+            if min_dist == float('inf') or density < 0.01:
+                freq = base_freq
+                vol = 0.05
             else:
                 # Map obstacle distance to frequency 
                 normalized_dist = ((dist - min_dist) / max_dist - min_dist)
