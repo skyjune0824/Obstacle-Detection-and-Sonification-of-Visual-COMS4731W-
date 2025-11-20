@@ -12,6 +12,7 @@ import numpy as np
 from src.MDE.estimator import MDE
 from old.depth2visualize import depth2ad
 from src.Segmentation.segmentation import SegmentationModule
+from src.AudioSynthesis.synthesize import AudioSynthesis
 
 class MDE_Pipeline:
     """ Monocular Depth Estimation Pipeline
@@ -27,6 +28,7 @@ class MDE_Pipeline:
                             grid_resolution=0.1,
                             grid_size=(100, 100)
                         )
+        self.synth = AudioSynthesis()
         self.sample_rate = rate
 
 
@@ -94,7 +96,8 @@ class MDE_Pipeline:
         print(seg_results["zones"])
 
         # Synthesize Audio
-
+        audio_params = self.synth.zones_to_audio(seg_results["zones"])
+        self.synth.continuous_audio(audio_params)
 
         # Debugging Visualization
         if DEBUG:
