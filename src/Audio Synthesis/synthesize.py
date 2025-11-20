@@ -63,7 +63,44 @@ class AudioSynthesis:
         
         return params
 
-    def
+    def output_audio(params):
+        """ Output Audio
+
+        Play short stereo audio with panning. 
+        """
+
+        # Parameters
+        freq = params['frequency']
+        vol = params['volume']
+        pan = params['pan']
+
+        duration = 0.2
+        sample_rate = 44100
+
+        # Time Array
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+
+        # Sine Wave
+        tone = np.sin(2 * np.pi * freq * t) * vol
+
+        # Stereo Panning
+        # Normalization
+        normalized_pan = (pan + 1)/2
+        left = tone * np.sqrt(1 - normalized_pan)
+        right = tone * np.sqrt(normalized_pan)
+
+        # Channel Combination
+        stereo = np.column_stack([left, right])
+
+        # Output
+        sd.play(stereo, samplerate=sample_rate)
+        sd.wait()
+
+
+
+
+
+
 
 
         
