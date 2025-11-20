@@ -8,7 +8,7 @@ class AudioSynthesis:
     distinguishing obstacle distance by pitch.
     """
     def __init__(self):
-        return NotImplemented
+        pass
     
     def zones_to_audio(self, zone):
         """ Zones to Audio
