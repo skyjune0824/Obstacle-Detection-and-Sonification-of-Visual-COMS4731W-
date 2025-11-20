@@ -10,7 +10,7 @@ import numpy as np
 
 # Modules
 from src.MDE.estimator import MDE
-from src.MDE.depth2visualize import depth2ad
+from old.depth2visualize import depth2ad
 from src.Segmentation.segmentation import SegmentationModule
 
 class MDE_Pipeline:
@@ -90,34 +90,33 @@ class MDE_Pipeline:
         # MDE Estimation
         mapping = self.model.infer_depth(pil_img)
 
-        # Debugging Visualization
-        if DEBUG:
-            visualize_depth(mapping)
-
-        # Create LiDAR Map
-        # result_array = depth2ad(mapping)
-
         # Segment
         seg_results = self.segmenter.process_depth_map(mapping)
-        vis, grid_vis = self.segmenter.visualize_results(mapping, seg_results, frame)
+
+        # Debugging Visualization
+        if DEBUG:
+            self.visualize_depth(mapping, seg_results, frame)
+
+
+    def visualize_depth(self, depth_map, seg_results, frame):
+        """
+        Visualize Depth
+
+        Used for debugging depth map output of sampled frame.
+        """
+        vis, grid_vis = self.segmenter.visualize_results(depth_map, seg_results, frame)
         cv2.imshow('Navigation View', vis)
         cv2.imshow('Occupancy Grid', grid_vis)
         cv2.waitKey(2000)
         cv2.destroyAllWindows()
 
+        # # Normalize depth values
+        # depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
+        # depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
+
+        # # Display Depth Map
+        # depth_img.show()
+
 def log(msg):
     if DEBUG:
         print(msg)
-
-def visualize_depth(depth_map):
-    """
-    Visualize Depth
-
-    Used for debugging depth map output of sampled frame.
-    """
-    # # Normalize depth values
-    # depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
-    # depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
-
-    # # Display Depth Map
-    # depth_img.show()
