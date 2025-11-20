@@ -1,5 +1,5 @@
 from MDE.estimator import MDE
-from modules.depth2visualize import depth2ad
+from MDE.depth2visualize import depth2ad
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np

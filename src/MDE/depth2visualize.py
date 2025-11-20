@@ -12,7 +12,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from preprocess.data_management import load_data
-from config import RAW_CSV_PATH
+from config import RAW_CSV_PATH, DEBUG
 
 
 def get_random_h5_path_from_csv(csv_path: Path) -> Path:
@@ -94,14 +94,13 @@ def get_random_h5_path_from_csv(csv_path: Path) -> Path:
 ANGLE_RESOLUTION = 1.0
 
 
-def depth2ad(depth_array: np.ndarray, title: str = "Filtered Bearings and Ranges (BEV)", debug: bool = False) -> np.ndarray:
+def depth2ad(depth_array: np.ndarray, title: str = "Filtered Bearings and Ranges (BEV)") -> np.ndarray:
     """
     Using Relative Depth Map to calculate relative distance.
 
     Args:
         depth_array (np.ndarray): 0-255 array of depth map
         title (str): name of visualization
-        debug (bool): 
         
     Returns:
         np.ndarray: list of (angle, distance) pairs.
@@ -126,7 +125,7 @@ def depth2ad(depth_array: np.ndarray, title: str = "Filtered Bearings and Ranges
     v_valid = v[mask]
 
     if len(Z_valid) < 100:
-        if debug:
+        if DEBUG:
             print("Not enough points for filtering.")
         return np.empty((0, 2))
 
@@ -156,7 +155,7 @@ def depth2ad(depth_array: np.ndarray, title: str = "Filtered Bearings and Ranges
             filtered_indices.append(
                 original_indices_in_bin[min_r_relative_index])
 
-    filtered_indices = np.array(filtered_indices)
+    filtered_indices = np.array(filtered_indices, dtype=np.int64)
 
     X_filtered = X_valid[filtered_indices]
     Z_filtered = Z_valid[filtered_indices]
@@ -173,7 +172,7 @@ def depth2ad(depth_array: np.ndarray, title: str = "Filtered Bearings and Ranges
     v_final_filtered
     )).T
     
-    if debug:
+    if DEBUG:
         import matplotlib.pyplot as plt
 
         fig, axes = plt.subplots(1, 2, figsize=(18, 8))
