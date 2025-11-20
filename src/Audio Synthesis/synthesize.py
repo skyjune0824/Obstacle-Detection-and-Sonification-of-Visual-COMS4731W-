@@ -1,4 +1,5 @@
 import numpy as np
+import sounddevice as sd
 
 class AudioSynthesis:
     """ AudioSynthesis
@@ -62,7 +63,7 @@ class AudioSynthesis:
         
         return params
 
-
+    def
 
 
         
