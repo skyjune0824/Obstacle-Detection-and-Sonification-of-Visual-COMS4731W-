@@ -22,12 +22,19 @@ def main():
         help="Structure From Motion -> Spatial Audio",
     )
 
+    parser.add_argument(
+        "--thresh",
+        type=int,
+        default=5,
+        help="Structure From Motion -> Spatial Audio",
+    )
+
     args = parser.parse_args()
 
     # Test
     if args.mde:
         # Initialize Pipeline
-        MDE = MDE_Pipeline(rate = 40)
+        MDE = MDE_Pipeline(rate=40, threshold=args.thresh)
 
         # Call Pipeline
         MDE.pipeline(args.input_video)

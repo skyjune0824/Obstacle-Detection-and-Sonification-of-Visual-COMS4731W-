@@ -144,21 +144,31 @@ class SegmentationModule:
         """
         height, width = depth_map.shape
         grid = np.zeros(self.grid_size, dtype=np.uint8)
+
+        # Establish minimum depth
+        min_depth = self.grid_resolution
+        camera_offset_z = int(0.5 / self.grid_resolution)  
         
         # Iterate through depth map pixels
         for y in range(height):
             for x in range(width):
                 if obstacle_mask[y, x] > 0 and depth_map[y, x] > 0:
                     depth = depth_map[y, x]
+
+                    print(f"DEPTH: {depth}")
+
+                    # Clamp Minimum Depth
+                    depth = np.maximum(depth, min_depth)
                     
                     # Project to world coordinates (simplified projection)
                     # Assume camera is at origin, looking forward
                     world_x = (x - width / 2) * depth / width * 2  # Lateral position
                     world_z = depth  # Forward distance
-                    
+
                     # Convert to grid coordinates
                     grid_x = int((world_x / self.grid_resolution) + self.grid_size[1] / 2)
-                    grid_z = int(world_z / self.grid_resolution)
+                    grid_z = int((world_z / self.grid_resolution) + camera_offset_z)                
+
                     
                     # Mark grid cell as occupied if within bounds
                     if 0 <= grid_x < self.grid_size[1] and 0 <= grid_z < self.grid_size[0]:

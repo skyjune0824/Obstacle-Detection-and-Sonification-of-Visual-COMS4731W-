@@ -21,10 +21,10 @@ class MDE_Pipeline:
     segmentation, and spatial audio synthesis.
     """
 
-    def __init__(self, rate):
+    def __init__(self, rate, threshold):
         self.model = MDE()
         self.segmenter = SegmentationModule(
-                            depth_threshold=2.5,
+                            depth_threshold=threshold,
                             grid_resolution=0.1,
                             grid_size=(100, 100)
                         )
