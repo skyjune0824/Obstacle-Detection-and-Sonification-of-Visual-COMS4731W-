@@ -34,7 +34,7 @@ def main():
     # Test
     if args.mde:
         # Initialize Pipeline
-        MDE = MDE_Pipeline(rate=60, threshold=args.thresh)
+        MDE = MDE_Pipeline(rate=30, threshold=args.thresh)
 
         # Call Pipeline
         MDE.pipeline(args.input_video)

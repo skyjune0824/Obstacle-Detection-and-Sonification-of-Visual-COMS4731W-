@@ -92,8 +92,8 @@ class MDE_Pipeline:
         # Segment
         seg_results = self.segmenter.process_depth_map(mapping)
 
-        # DEBUGGING 
-        print(seg_results["zones"])
+        # DEBUG 
+        log(seg_results["zones"])
 
         # Synthesize Audio
         audio_params = self.synth.zones_to_audio(seg_results["zones"])
