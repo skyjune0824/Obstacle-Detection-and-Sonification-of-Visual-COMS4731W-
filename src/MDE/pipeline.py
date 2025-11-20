@@ -14,8 +14,7 @@ from old.depth2visualize import depth2ad
 from src.Segmentation.segmentation import SegmentationModule
 
 class MDE_Pipeline:
-    """
-    Monocular Depth Estimation Pipeline
+    """ Monocular Depth Estimation Pipeline
 
     Processes a video into spatial audio for obstacle detection via monocular depth estimation,
     segmentation, and spatial audio synthesis.
@@ -32,8 +31,7 @@ class MDE_Pipeline:
 
 
     def pipeline(self, source):
-        """
-        Pipeline
+        """ Pipeline
         1. Samples Frames 
         2. Converts Frame to Depth Map
         3. Segments Depth Map
@@ -75,8 +73,7 @@ class MDE_Pipeline:
 
 
     def process(self, frame):
-        """
-        Process
+        """ Process
         Denotes one singular pass in the pipeline.
         1. Captures Depth Map
         2. Segments Depth Map and creates BEV.
@@ -99,8 +96,7 @@ class MDE_Pipeline:
 
 
     def visualize_depth(self, depth_map, seg_results, frame):
-        """
-        Visualize Depth
+        """ Visualize Depth
 
         Used for debugging depth map output of sampled frame.
         """
