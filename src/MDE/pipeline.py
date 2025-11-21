@@ -30,6 +30,13 @@ class MDE_Pipeline:
         self.synth = SpatialAudioFeedback()
         self.sample_rate = rate
 
+        # Visualization for Synth Testing
+        self.audio_trace =  {
+            'left': [],
+            'center': [],
+            'right': []
+        }
+
 
     def pipeline(self, source):
         """ Pipeline
@@ -70,8 +77,7 @@ class MDE_Pipeline:
 
         log("Complete.")
 
-        return NotImplemented
-
+        return self.audio_trace
 
     def process(self, frame):
         """ Process
@@ -94,9 +100,6 @@ class MDE_Pipeline:
         # Segment BEV
         segmented_bev = self.segmenter.occupancy_grid_to_zones(seg_results["occupancy_grid"])
 
-        # DEBUG 
-        log(segmented_bev)
-
         # Synthesize Audio
         audio_params = self.synth.obstacle_to_audio_params(seg_results["zones"])
         self.synth.play_audio_feedback(audio_params)
@@ -104,6 +107,7 @@ class MDE_Pipeline:
         # Debugging Visualization
         if DEBUG:
             self.visualize_depth(mapping, seg_results, frame)
+            self.log_audio(seg_results["zones"], audio_params)
 
 
     def visualize_depth(self, depth_map, seg_results, frame):
@@ -123,6 +127,16 @@ class MDE_Pipeline:
 
         # # Display Depth Map
         # depth_img.show()
+
+    def log_audio(self, zone_params, audio_params):
+        for zone, zone_params in zone_params.items():
+            self.audio_trace[zone].append(
+                (
+                    zone_params['min_distance'],
+                    audio_params[zone]['frequency'],
+                    audio_params[zone]['volume']
+                )
+            )
 
 def log(msg):
     if DEBUG:
