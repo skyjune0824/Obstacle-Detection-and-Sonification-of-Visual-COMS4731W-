@@ -11,7 +11,7 @@ import numpy as np
 # Modules
 from src.MDE.estimator import MDE
 from src.Segmentation.segmentation import SegmentationModule
-from src.AudioSynthesis.synthesize import AudioSynthesis
+from AudioSynthesis.synthesize import SpatialAudioFeedback
 
 class MDE_Pipeline:
     """ Monocular Depth Estimation Pipeline
@@ -27,7 +27,7 @@ class MDE_Pipeline:
                             grid_resolution=0.1,
                             grid_size=(100, 100)
                         )
-        self.synth = AudioSynthesis()
+        self.synth = SpatialAudioFeedback()
         self.sample_rate = rate
 
 
@@ -91,12 +91,15 @@ class MDE_Pipeline:
         # Segment
         seg_results = self.segmenter.process_depth_map(mapping)
 
+        # Segment BEV
+        segmented_bev = self.segmenter.occupancy_grid_to_zones(seg_results["occupancy_grid"])
+
         # DEBUG 
-        log(seg_results["zones"])
+        log(segmented_bev)
 
         # Synthesize Audio
-        audio_params = self.synth.zones_to_audio(seg_results["zones"])
-        self.synth.continuous_audio(audio_params)
+        audio_params = self.synth.obstacle_to_audio_params(seg_results["zones"])
+        self.synth.play_audio_feedback(audio_params)
 
         # Debugging Visualization
         if DEBUG:

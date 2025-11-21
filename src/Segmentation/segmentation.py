@@ -8,7 +8,7 @@ class SegmentationModule:
     Processes depth maps to detect obstacles, create occupancy grids, and identify moving objects
     """
     
-    def __init__(self, depth_threshold=2.0, grid_resolution=0.1, grid_size=(100, 100)):
+    def __init__(self, depth_threshold=2.0, grid_resolution=0.01, grid_size=(100, 100)):
         """
         Initialize segmentation module
         
@@ -169,15 +169,20 @@ class SegmentationModule:
 
                     
                     # Mark grid cell as occupied if within bounds
-                    if 0 <= grid_x < self.grid_size[1] and 0 <= grid_z < self.grid_size[0]:
-                        grid[grid_z, grid_x] = 255
+                    grid_z = np.clip(grid_z, 0, self.grid_size[0]-1)
+                    grid_x = np.clip(grid_x, 0, self.grid_size[1]-1)
+                    grid[grid_z, grid_x] = 255
+
+                    # if 0 <= grid_x < self.grid_size[1] and 0 <= grid_z < self.grid_size[0]:
+                    #     grid[grid_z, grid_x] = 255
                         # print(f"X: {grid_x}, Z: {grid_z}")
 
         
         return grid
     
     def occupancy_grid_to_zones(self, occupancy_grid):
-        """
+        """ Occupancy Grid To Zones
+
         Convert occupancy grid to left/center/right zones for audio mapping.
         """
 

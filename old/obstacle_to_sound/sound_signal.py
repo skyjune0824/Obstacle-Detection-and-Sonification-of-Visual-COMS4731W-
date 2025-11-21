@@ -81,7 +81,7 @@ def obstacle_to_audio_params(zones):
             continue
         
         # Map distance to frequency (closer = higher pitch)
-        # Inverse exponential mapping for more intuitive feedback
+        # Inverse exponential mapping for more better feedback
         freq = BASE_FREQ + (MAX_FREQ - BASE_FREQ) * np.exp(-distance / 2.0)
         
         # Map distance to volume (closer = louder)

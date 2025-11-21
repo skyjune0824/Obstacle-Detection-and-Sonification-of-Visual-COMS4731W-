@@ -1,132 +1,128 @@
+import pyaudio
 import numpy as np
-import sounddevice as sd
 
-class AudioSynthesis:
-    """ AudioSynthesis
-
-    Converts occupancy grid and zones into spatial panning audio,
-    distinguishing obstacle distance by pitch.
-    """
-
-    def __init__(self, sample_rate=44100, buffer_size=1024):
-        self.fs = sample_rate
-        self.buffer_size = buffer_size
-        self.frequency = 440
-        self.volume = 0.5
-        self.pan = 0.0
-        self.phase = 0
-
-        # Audio Stream
-        self.stream = sd.OutputStream(
-            channels=2,
-            samplerate=self.fs,
-            callback=self.output_audio,
-            blocksize=self.buffer_size
+class SpatialAudioFeedback:
+    def __init__(self, sample_rate=44100):
+        self.sample_rate = sample_rate
+        self.p = pyaudio.PyAudio()
+        self.stream = self.p.open(
+            format=pyaudio.paFloat32,
+            channels=2,  # Stereo output
+            rate=sample_rate,
+            output=True,
+            frames_per_buffer=1024
         )
-
-        self.stream.start()
-
-
-    def zones_to_audio(self, zones):
-        """ Zones to Audio
-
-        Takes divided zones and creates parametrizes audio signal. 
-        """
-
-        # Store Audio parameters for returning
-        params = {}
- 
-        # Furthest Object Freq
-        base_freq = 200
-        # Closest Object Freq
-        max_freq = 1000
+        self.is_playing = False
         
-        # Common Freq
-        freq = 0
-        # Common Volume
-        vol = 0
-
-        # Min Distance (In meters)
-        min_dist = 0.2 
-        max_dist = 5.0 
-
-        # Panning Map, Looks like avoiding "1" avoids the sounds from being directly at the edge of each speaker.
-        pan_map = {'left': -0.8, 'center': 0.0, 'right': 0.8}
-
-        for zone, data in zones.items():
-            dist = data["min_distance"]
-            density = data["obstacle_density"]
-
-            # Zero Obstacles = No Audible Frequency
-            if min_dist == float('inf') or density < 0.01:
-                freq = base_freq
-                vol = 0.05
-            else:
-                # Map obstacle distance to frequency 
-                normalized_dist = ((dist - min_dist) / max_dist - min_dist)
-                freq = max_freq - (normalized_dist * (max_freq - base_freq))
-
-                # Clip Freq in Case
-                freq = np.clip(freq, base_freq, max_freq)
-
-                # Volume Mapping from 0 - 1 where density already is a fraction.
-                vol = np.clip(density, 0.1, 1.0)
+    def generate_tone(self, frequency, duration, volume, pan):
+        """
+        Generate stereo audio tone with spatial panning
+        
+        Args:
+            frequency: Tone frequency in Hz
+            duration: Duration in seconds
+            volume: Amplitude (0-1)
+            pan: Stereo position (-1 left, 0 center, +1 right)
+        """
+        t = np.linspace(0, duration, int(self.sample_rate * duration))
+        
+        # Generate sine wave
+        tone = volume * np.sin(2 * np.pi * frequency * t)
+        
+        # Apply stereo panning using constant-power panning
+        # https://www.cs.cmu.edu/~music/icm-online/readings/panlaws/
+        pan_rad = (pan + 1) * np.pi / 4  # Convert [-1, 1] to [0, pi/2]
+        left_gain = np.cos(pan_rad)
+        right_gain = np.sin(pan_rad)
+        
+        # Create stereo signal
+        stereo = np.zeros((len(tone), 2), dtype=np.float32)
+        stereo[:, 0] = tone * left_gain   # Left channel
+        stereo[:, 1] = tone * right_gain  # Right channel
+        
+        return stereo
+    
+    def obstacle_to_audio_params(self, zones):
+        """
+        Convert obstacle zones to audio parameters
+        
+        Args:
+            zones: Spatial zone information our segmentation output.
+        
+        Returns:
+            audio_params: Dict with frequency, volume, pan per zone
+        """
+        audio_params = {}
+        
+        # Base frequency and volume ranges
+        BASE_FREQ = 200  # Hz
+        MAX_FREQ = 2000  # Hz
+        BASE_VOLUME = 0.2
+        MAX_VOLUME = 1.0
+        
+        for zone_name, zone_data in zones.items():
+            distance = zone_data['min_distance']
             
-            # DEBUG
-            print(f"FREQ: {freq}, VOL: {vol}, PAN: {pan_map[zone]}")
-
-            params[zone] = {
+            if distance == float('inf'):
+                # No obstacles in this zone
+                audio_params[zone_name] = {
+                    'frequency': 0,
+                    'volume': 0,
+                    'pan': 0
+                }
+                continue
+            
+            # Map distance to frequency (closer = higher pitch)
+            # Inverse exponential mapping for more better feedback
+            freq = BASE_FREQ + (MAX_FREQ - BASE_FREQ) * np.exp(-distance / 2.0)
+            
+            # Map distance to volume (closer = louder)
+            volume = BASE_VOLUME + (MAX_VOLUME - BASE_VOLUME) * (1 - distance / 5.0)
+            volume = np.clip(volume, BASE_VOLUME, MAX_VOLUME)
+            
+            # Stereo panning: -1 (left) to +1 (right)
+            pan_map = {'left': -0.8, 'center': 0.0, 'right': 0.8}
+            pan = pan_map[zone_name]
+            
+            audio_params[zone_name] = {
                 'frequency': freq,
-                'volume': vol,
-                'pan': pan_map[zone]
+                'volume': volume,
+                'pan': pan
             }
         
-        return params
+        return audio_params
 
-    def output_audio(self, outdata, frames, time, status):
-        """ Output Audio
-
-        Play short stereo audio with panning. 
+    
+    def play_audio_feedback(self, audio_params, duration=0.2):
         """
-
-        # Time Array
-        t = (np.arange(frames) + self.phase) / self.fs
-        self.phase += frames
-
-        # Sine Wave
-        tone = np.sin(2 * np.pi * self.frequency * t) * self.volume
-
-        # Stereo Panning
-        # Normalization
-        normalized_pan = (self.pan + 1)/2
-        left = tone * np.sqrt(1 - normalized_pan)
-        right = tone * np.sqrt(normalized_pan)
-
-        # Channel Combination
-        outdata[:] = np.column_stack([left, right])
-
-
-    def continuous_audio(self, params):
-        """ Continuous Audio
+        Play real-time spatial audio feedback for all zones
         
-        Plays a continuous stream of audio to match obstacle information.
+        Args:
+            audio_params: Dict from obstacle_to_audio_params()
+            duration: Tone duration in seconds
         """
-
-        for zone, data in params.items():
-            # Update Audio Params for Continuous Stream
-            if data['frequency'] is not None:
-                self.frequency = data['frequency']
-            if data['volume'] is not None:
-                self.volume = data['volume']
-            if data['pan'] is not None:
-                self.pan = data['pan']
-
-    def stop(self):
-        self.stream.stop()
+        # Mix audio from all three zones
+        mixed_audio = np.zeros((int(self.sample_rate * duration), 2), dtype=np.float32)
+        
+        for zone_name, params in audio_params.items():
+            if params['frequency'] > 0:  # Skip zones without obstacles
+                tone = self.generate_tone(
+                    params['frequency'],
+                    duration,
+                    params['volume'],
+                    params['pan']
+                )
+                mixed_audio += tone
+        
+        # Normalize to prevent clipping
+        max_val = np.max(np.abs(mixed_audio))
+        if max_val > 1.0:
+            mixed_audio /= max_val
+        
+        # Play audio
+        self.stream.write(mixed_audio.tobytes())
+    
+    def close(self):
+        self.stream.stop_stream()
         self.stream.close()
-
-
-
-
-
-        
+        self.p.terminate()
