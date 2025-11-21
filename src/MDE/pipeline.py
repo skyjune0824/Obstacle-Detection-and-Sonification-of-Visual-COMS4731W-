@@ -121,13 +121,6 @@ class MDE_Pipeline:
         cv2.waitKey(2000)
         cv2.destroyAllWindows()
 
-        # # Normalize depth values
-        # depth_norm = (depth_map - depth_map.min()) / (depth_map.max() - depth_map.min())
-        # depth_img = Image.fromarray((depth_norm * 255).astype(np.uint8))
-
-        # # Display Depth Map
-        # depth_img.show()
-
     def log_audio(self, zone_params, audio_params):
         for zone, zone_params in zone_params.items():
             self.audio_trace[zone].append(
