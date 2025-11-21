@@ -1,18 +1,45 @@
 import pyaudio
 import numpy as np
+import threading
 
 class SpatialAudioFeedback:
     def __init__(self, sample_rate=44100):
         self.sample_rate = sample_rate
+        self.frames_per_buffer = 1024
         self.p = pyaudio.PyAudio()
         self.stream = self.p.open(
             format=pyaudio.paFloat32,
             channels=2,  # Stereo output
             rate=sample_rate,
             output=True,
-            frames_per_buffer=1024
+            frames_per_buffer=self.frames_per_buffer
         )
-        self.is_playing = False
+
+        # Shared Buffer that holds our current playing tone
+        self.current_tone = np.zeros((self.frames_per_buffer, 2), dtype=np.float32)
+
+        # Mutex Lock to Ensure Only one player has access to our shared tone buffer
+        self.lock = threading.Lock()
+        self.running = True
+
+        # Initiates Looping Audio Thread
+        self.thread = threading.Thread(target=self.audio_loop)
+        self.thread.start()
+
+    
+    def audio_loop(self):
+        """ Audio Loop
+        
+        While the stream is active, if we have a lock free, we can write an audio segment to the stream until
+        a new tone arrives.
+        """
+        
+        while self.running:
+            with self.lock:
+                chunk = self.current_tone.copy()
+            
+            self.stream.write(chunk.tobytes(), exception_on_underflow=False)
+
         
     def generate_tone(self, frequency, duration, volume, pan):
         """
@@ -119,8 +146,18 @@ class SpatialAudioFeedback:
         if max_val > 1.0:
             mixed_audio /= max_val
         
-        # Play audio
-        self.stream.write(mixed_audio.tobytes())
+        # Prepare one buffer-sized chunk
+        chunk_len = self.frames_per_buffer
+        if mixed_audio.shape[0] >= chunk_len:
+            chunk = mixed_audio[:chunk_len]
+        else:
+            # Loop Current Audio to fill shared buffer.
+            reps = (chunk_len // mixed_audio.shape[0]) + 1
+            chunk = np.tile(mixed_audio, (reps, 1))[:chunk_len]
+
+        # Update the live tone chunk if we have a lock free
+        with self.lock:
+            self.current_tone = chunk.astype(np.float32)
     
     def close(self):
         self.stream.stop_stream()

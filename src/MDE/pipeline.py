@@ -11,7 +11,7 @@ import numpy as np
 # Modules
 from src.MDE.estimator import MDE
 from src.Segmentation.segmentation import SegmentationModule
-from AudioSynthesis.synthesize import SpatialAudioFeedback
+from src.AudioSynthesis.synthesize import SpatialAudioFeedback
 
 class MDE_Pipeline:
     """ Monocular Depth Estimation Pipeline
