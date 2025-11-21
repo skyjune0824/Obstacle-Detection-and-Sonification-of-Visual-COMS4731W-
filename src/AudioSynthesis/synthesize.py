@@ -83,9 +83,9 @@ class SpatialAudioFeedback:
         
         # Base frequency and volume ranges
         BASE_FREQ = 200  
-        MAX_FREQ = 2000 
+        MAX_FREQ = 800 
         BASE_VOLUME = 0.2
-        MAX_VOLUME = 1.0
+        MAX_VOLUME = 0.8
         
         for zone_name, zone_data in zones.items():
             distance = zone_data['min_distance']
@@ -154,15 +154,16 @@ class SpatialAudioFeedback:
         else:
             # Loop Current Audio to fill shared buffer.
             reps = (chunk_len // mixed_audio.shape[0]) + 1
-            chunk = np.tile(mixed_audio, (reps, 1))[:chunk_len]
+            chunk[:mixed_audio.shape[0]] = mixed_audio
 
         # Update the live tone chunk if we have a lock free
         with self.lock:
             self.current_tone = chunk.astype(np.float32)
     
     def close(self):
-        self.running = False
-        self.thread.join()
+        # Send silence into buffer
         self.stream.stop_stream()
         self.stream.close()
+        self.running = False
+        self.thread.join()
         self.p.terminate()
