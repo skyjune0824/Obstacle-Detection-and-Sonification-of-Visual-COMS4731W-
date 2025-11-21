@@ -9,7 +9,7 @@ class SpatialAudioFeedback:
         self.p = pyaudio.PyAudio()
         self.stream = self.p.open(
             format=pyaudio.paFloat32,
-            channels=2,  # Stereo output
+            channels=2, 
             rate=sample_rate,
             output=True,
             frames_per_buffer=self.frames_per_buffer
@@ -33,7 +33,7 @@ class SpatialAudioFeedback:
         While the stream is active, if we have a lock free, we can write an audio segment to the stream until
         a new tone arrives.
         """
-        
+
         while self.running:
             with self.lock:
                 chunk = self.current_tone.copy()
@@ -64,8 +64,8 @@ class SpatialAudioFeedback:
         
         # Create stereo signal
         stereo = np.zeros((len(tone), 2), dtype=np.float32)
-        stereo[:, 0] = tone * left_gain   # Left channel
-        stereo[:, 1] = tone * right_gain  # Right channel
+        stereo[:, 0] = tone * left_gain  
+        stereo[:, 1] = tone * right_gain 
         
         return stereo
     
@@ -82,8 +82,8 @@ class SpatialAudioFeedback:
         audio_params = {}
         
         # Base frequency and volume ranges
-        BASE_FREQ = 200  # Hz
-        MAX_FREQ = 2000  # Hz
+        BASE_FREQ = 200  
+        MAX_FREQ = 2000 
         BASE_VOLUME = 0.2
         MAX_VOLUME = 1.0
         
@@ -132,7 +132,8 @@ class SpatialAudioFeedback:
         mixed_audio = np.zeros((int(self.sample_rate * duration), 2), dtype=np.float32)
         
         for zone_name, params in audio_params.items():
-            if params['frequency'] > 0:  # Skip zones without obstacles
+            # Skip zones without obstacles
+            if params['frequency'] > 0: 
                 tone = self.generate_tone(
                     params['frequency'],
                     duration,
@@ -160,6 +161,8 @@ class SpatialAudioFeedback:
             self.current_tone = chunk.astype(np.float32)
     
     def close(self):
+        self.running = False
+        self.thread.join()
         self.stream.stop_stream()
         self.stream.close()
         self.p.terminate()
