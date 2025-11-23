@@ -59,7 +59,10 @@ class SFM_Pipeline:
                 curr_pose = pose_init @ new_pose
 
                 # Triangulate
-                self.triangulate(pose_init, curr_pose, pts_one, pts_two)
+                points = self.triangulate(pose_init, curr_pose, pts_one, pts_two)
+
+                # Find Distance to closest object in each zone.
+                minimum = self.min_distance(curr_pose, points)
 
 
             # Increment Frame Count
@@ -168,9 +171,21 @@ class SFM_Pipeline:
         pts3d = pts3d_h_filtered[:, :3] / pts3d_h_filtered[:, 3][:, np.newaxis]
     
         # Return the 3D points
-        log(f"Triangulated Points: {pts3d}")
+        # log(f"Triangulated Points: {pts3d}")
 
         return pts3d
+    
+    def min_distance(self, pose, points):
+        min_dist = float('inf')
+
+        if points.shape[0] > 0:
+            cam_pos = pose[:3, 3]
+            dists = np.linalg.norm(points - cam_pos[None, :], axis=1)
+            min_dist = np.min(dists)
+            print(f"Closest obstacle distance: {min_dist:.2f}")
+        
+        return min_dist
+
  
 def log(msg):
     if DEBUG:
