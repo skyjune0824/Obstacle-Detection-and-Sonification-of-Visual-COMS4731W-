@@ -41,6 +41,9 @@ class SFM_Pipeline:
         # Establish Frame Count
         frame_cnt = 0
 
+        # Initial Pose
+        prev_pose = np.eye(4)
+
         # Core Pipeline Loop
         while True:
             # Read Frame While Possible
@@ -49,21 +52,20 @@ class SFM_Pipeline:
             if not ret:
                 break
 
-            # Initial Pose
-            pose_init = np.eye(4)
-
             # Sample and Process Frame in multiples of "Sample Rate". 
             if frame_cnt % self.sample_rate == 0:
                 # Calculate Pose
                 new_pose, pts_one, pts_two = self.process_trajectory(frame_one, frame_two)
-                curr_pose = pose_init @ new_pose
+                curr_pose = prev_pose @ new_pose
 
                 # Triangulate
-                points = self.triangulate(pose_init, curr_pose, pts_one, pts_two)
+                points = self.triangulate(prev_pose, curr_pose, pts_one, pts_two)
 
                 # Find Distance to closest object in each zone.
                 minimum = self.min_distance(curr_pose, points)
 
+                # Set Prev Pose
+                prev_pose = curr_pose
 
             # Increment Frame Count
             frame_cnt += 1
