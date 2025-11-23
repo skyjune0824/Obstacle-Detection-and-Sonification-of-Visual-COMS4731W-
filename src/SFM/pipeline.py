@@ -59,7 +59,7 @@ class SFM_Pipeline:
 
         log("Complete.")
 
-        return self.audio_trace
+        # return self.audio_trace
     
     def process(self, frame):
         """ Process
