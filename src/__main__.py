@@ -40,7 +40,7 @@ def main():
         MDE.pipeline(args.input_video)
     elif args.sfm:
         # Initialize Pipeline
-        SFM = SFM_Pipeline(rate=30)
+        SFM = SFM_Pipeline(rate=60)
 
         # Call Pipeline
         SFM.pipeline(args.input_video)
