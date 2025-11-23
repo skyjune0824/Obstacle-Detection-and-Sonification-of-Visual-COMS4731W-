@@ -71,7 +71,13 @@ class SFM_Pipeline:
         """
 
         # Preprocess
-        pil_img = Image.fromarray(frame)
+        img = cv2.imread(frame)
+
+        # Extract ORB Features
+        orb = cv2.ORB_create(nfeatures=5000)
+
+        # Get Key Points
+        keypoints, descriptors = orb.detectAndCompute(img, None)
 
 
 def log(msg):
