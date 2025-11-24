@@ -16,9 +16,11 @@ class SFM_Pipeline:
     estimating object distance for sonification.
     """
 
-    def __init__(self, rate):
+    def __init__(self, rate, W = 1080, H = 1920, F = 780):
         self.synth = SpatialAudioFeedback()
         self.sample_rate = rate
+        self.K = np.array([[F, 0, W // 2], [0, F, H // 2], [0, 0, 1]])
+
 
     def pipeline(self, source):
         """
@@ -43,31 +45,37 @@ class SFM_Pipeline:
 
         # Initial Pose
         prev_pose = np.eye(4)
+        prev_frame = None
 
         # Core Pipeline Loop
         while True:
             # Read Frame While Possible
-            ret, frame_one = cap.read()
-            ret, frame_two = cap.read()
+            ret, cur_frame = cap.read()
             if not ret:
                 break
 
             # Sample and Process Frame in multiples of "Sample Rate". 
             if frame_cnt % self.sample_rate == 0:
-                # Calculate Pose
-                new_pose, pts_one, pts_two = self.process_trajectory(frame_one, frame_two)
-                curr_pose = prev_pose @ new_pose
+                if prev_frame is not None:
+                    # Calculate Pose
+                    new_pose, pts_one, pts_two = self.process_trajectory(prev_frame, cur_frame)
+                    curr_pose = np.dot(new_pose, prev_pose)
 
-                # Triangulate
-                points = self.triangulate(prev_pose, curr_pose, pts_one, pts_two)
+                    # Triangulate
+                    points = self.triangulate(curr_pose, prev_pose, pts_two, pts_one)
 
-                # Find Distance to closest object in each zone.
-                minimum = self.min_distance(curr_pose, points)
+                    # # Find Distance to closest object in each zone.
+                    # minimum, min_idx = self.min_distance(curr_pose, points)
 
-                # Set Prev Pose
-                prev_pose = curr_pose
+                    # # Visualize
+                    # if DEBUG and min_idx is not None:
+                    #     self.viz_dist_points(min_idx, minimum, curr_pose, points, cur_frame)
 
-            # Increment Frame Count
+                    # Set Prev Pose
+                    prev_pose = curr_pose
+
+                # Increment Frame Count
+                prev_frame = cur_frame.copy()
             frame_cnt += 1
             
         # Release Video Source
@@ -101,38 +109,33 @@ class SFM_Pipeline:
         # Sort Matches
         matches = sorted(matches, key=lambda x: x.distance)
 
-        if DEBUG:
-            match_img = cv2.drawMatches(
-                frame_one, keypoint_one,
-                frame_two, keypoint_two,
-                matches[:50],
-                None,
-                flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
-            )
-            cv2.imshow("Feature Matches", match_img)
-            cv2.waitKey(0)
+        # if DEBUG:
+        #     match_img = cv2.drawMatches(
+        #         frame_one, keypoint_one,
+        #         frame_two, keypoint_two,
+        #         matches[:50],
+        #         None,
+        #         flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+        #     )
+        #     cv2.imshow("Feature Matches", match_img)
+        #     cv2.waitKey(0)
 
         # Match Points
         pts_one = np.float32([keypoint_one[m.queryIdx].pt for m in matches])
         pts_two = np.float32([keypoint_two[m.trainIdx].pt for m in matches])
         
-        # Approximated Intrinsic for iPhone 14
-        K = np.array([[780, 0, 540],
-              [0, 780, 960],
-              [0, 0, 1]])
-        
         # Fundamental Matrix
         F, inliers = cv2.findFundamentalMat(pts_one, pts_two, cv2.FM_RANSAC)
 
         # Essential Matrix
-        E = K.T @ F @ K
+        E = self.K.T @ F @ self.K
 
         # Get Points for Inliner Matches
         pts_one_inliers = pts_one[inliers.ravel() == 1]
         pts2_two_inliers = pts_two[inliers.ravel() == 1]
 
         # Decompose for Rotation + Translation
-        _, R, t, mask = cv2.recoverPose(E, pts_one_inliers, pts2_two_inliers, K)
+        _, R, t, mask = cv2.recoverPose(E, pts_one_inliers, pts2_two_inliers, self.K)
 
         # Construct Pose Matrix
         pose = np.eye(4)
@@ -170,23 +173,64 @@ class SFM_Pipeline:
         # Divide Out W from [X, Y, Z, W] and remove invalid points.
         valid_filter = (np.abs(points_3d_h[:, 3]) > 0.005) & (points_3d_h[:, 2] > 0)
         pts3d_h_filtered = points_3d_h[valid_filter]  
-        pts3d = pts3d_h_filtered[:, :3] / pts3d_h_filtered[:, 3][:, np.newaxis]
-    
-        # Return the 3D points
-        # log(f"Triangulated Points: {pts3d}")
+        pts3d_h_filtered /= pts3d_h_filtered[:, 3:]
 
-        return pts3d
+        # DEBUG
+        if DEBUG and pts3d_h_filtered.any():
+            log(f"Triangulated {len(pts3d_h_filtered)} points")
+            log(f"Z range: {pts3d_h_filtered[:, 2].min():.2f} to {pts3d_h_filtered[:, 2].max():.2f}")
+            log(f"XY range: X[{pts3d_h_filtered[:, 0].min():.2f}, {pts3d_h_filtered[:, 0].max():.2f}], "
+                f"Y[{pts3d_h_filtered[:, 1].min():.2f}, {pts3d_h_filtered[:, 1].max():.2f}]")
+                
+        # Return the 3D points
+        return pts3d_h_filtered
     
     def min_distance(self, pose, points):
         min_dist = float('inf')
 
         if points.shape[0] > 0:
             cam_pos = pose[:3, 3]
-            dists = np.linalg.norm(points - cam_pos[None, :], axis=1)
-            min_dist = np.min(dists)
-            print(f"Closest obstacle distance: {min_dist:.2f}")
+            dists = np.linalg.norm(points - cam_pos[None, :], axis=1)        
+            min_idx = np.argmin(dists)
+            min_dist = dists[min_idx]
         
-        return min_dist
+            if min_idx is None:
+                return min_dist, None
+            else:
+                return min_dist, min_idx
+  
+        return min_dist, None
+    
+    def viz_dist_points(self, min_idx, min_dist, pose, points, cur_frame):
+        # Extract the 3D point in world coordinates
+        point_w = points[min_idx]
+
+        # Extract rotation and translation from pose (world to camera)
+        R = pose[:3, :3]
+        t = pose[:3, 3]
+
+        # Convert world point to camera coordinates
+        point_c = R.T @ (point_w - t)  # correct world->camera transform
+
+        # Project to image plane
+        uv_h = self.K @ point_c
+        uv = (uv_h[:2] / uv_h[2]).astype(int)
+
+        # Clip coordinates to image bounds
+        h, w, _ = cur_frame.shape
+        uv[0] = np.clip(uv[0], 0, w-1)
+        uv[1] = np.clip(uv[1], 0, h-1)
+
+        # Draw on frame
+        cv2.circle(cur_frame, tuple(uv), 8, (0, 0, 255), -1)
+        cv2.putText(cur_frame, f"{min_dist:.2f}m", (uv[0]+10, uv[1]-10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
+        # DEBUG
+        # log(f"Pos: {uv}")
+
+        cv2.imshow("SFM Min Distance", cur_frame)
+        cv2.waitKey(1)
 
  
 def log(msg):
