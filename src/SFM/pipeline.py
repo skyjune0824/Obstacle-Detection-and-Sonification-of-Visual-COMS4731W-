@@ -16,10 +16,10 @@ class SFM_Pipeline:
     estimating object distance for sonification.
     """
 
-    def __init__(self, rate, W = 1080, H = 1920, F = 780):
+    def __init__(self, rate, K):
         self.synth = SpatialAudioFeedback()
         self.sample_rate = rate
-        self.K = np.array([[F, 0, W // 2], [0, F, H // 2], [0, 0, 1]])
+        self.K = K
 
 
     def pipeline(self, source):
@@ -55,27 +55,26 @@ class SFM_Pipeline:
                 break
 
             # Sample and Process Frame in multiples of "Sample Rate". 
-            if frame_cnt % self.sample_rate == 0:
-                if prev_frame is not None:
-                    # Calculate Pose
-                    new_pose, pts_one, pts_two = self.process_trajectory(prev_frame, cur_frame)
-                    curr_pose = np.dot(new_pose, prev_pose)
+            if prev_frame is not None:
+                # Calculate Pose
+                new_pose, pts_one, pts_two = self.process_trajectory(prev_frame, cur_frame)
+                curr_pose = np.dot(new_pose, prev_pose)
 
-                    # Triangulate
-                    points = self.triangulate(curr_pose, prev_pose, pts_two, pts_one)
+                # Triangulate
+                points = self.triangulate(curr_pose, prev_pose, pts_two, pts_one)
 
-                    # # Find Distance to closest object in each zone.
-                    # minimum, min_idx = self.min_distance(curr_pose, points)
+                # # Find Distance to closest object in each zone.
+                # minimum, min_idx = self.min_distance(curr_pose, points)
 
-                    # # Visualize
-                    # if DEBUG and min_idx is not None:
-                    #     self.viz_dist_points(min_idx, minimum, curr_pose, points, cur_frame)
+                # # Visualize
+                # if DEBUG and min_idx is not None:
+                #     self.viz_dist_points(min_idx, minimum, curr_pose, points, cur_frame)
 
-                    # Set Prev Pose
-                    prev_pose = curr_pose
+                # Set Prev Pose
+                prev_pose = curr_pose
 
-                # Increment Frame Count
-                prev_frame = cur_frame.copy()
+            # Increment Frame Count
+            prev_frame = cur_frame.copy()
             frame_cnt += 1
             
         # Release Video Source
@@ -109,16 +108,16 @@ class SFM_Pipeline:
         # Sort Matches
         matches = sorted(matches, key=lambda x: x.distance)
 
-        # if DEBUG:
-        #     match_img = cv2.drawMatches(
-        #         frame_one, keypoint_one,
-        #         frame_two, keypoint_two,
-        #         matches[:50],
-        #         None,
-        #         flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
-        #     )
-        #     cv2.imshow("Feature Matches", match_img)
-        #     cv2.waitKey(0)
+        if DEBUG:
+            match_img = cv2.drawMatches(
+                frame_one, keypoint_one,
+                frame_two, keypoint_two,
+                matches,
+                None,
+                flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+            )
+            cv2.imshow("Feature Matches", match_img)
+            cv2.waitKey(0)
 
         # Match Points
         pts_one = np.float32([keypoint_one[m.queryIdx].pt for m in matches])
@@ -141,6 +140,10 @@ class SFM_Pipeline:
         pose = np.eye(4)
         pose[:3, :3] = R
         pose[:3, 3] = t.ravel()
+
+        # DEBUG
+        if DEBUG:
+            log(f"POSE: {pose}")
 
         return pose, pts_one_inliers, pts2_two_inliers
 
