@@ -78,11 +78,11 @@ class SFM_Pipeline:
                         log(f"World Map Added {len(world_points_current)}. TOTAL SIZE: {len(self.world_map)}")
 
                     # Find Distance to closest object in each zone.
-                    minimum, min_idx = self.min_distance(curr_pose[:3, 3])
+                    minimum, min_pnt = self.min_distance(curr_pose[:3, 3])
 
                     # Visualize
-                    if DEBUG and min_idx is not None and local_points.any():
-                        self.viz_dist_points(min_idx, minimum, curr_pose, cur_frame)
+                    if DEBUG and min_pnt is not None and local_points.any():
+                        self.viz_dist_points(min_pnt, minimum, curr_pose, cur_frame)
 
                 # Set Prev Pose
                 prev_pose = curr_pose
@@ -167,14 +167,14 @@ class SFM_Pipeline:
         pose2 = pose2[:3, :]
 
         # DEBUG
-        if DEBUG:
-            log(f"POSE1: {pose1},\n POSE2: {pose2}")
-            log(f"pts1: {pts1.T}, pts2: {pts2.T}")
+        # if DEBUG:
+        #     log(f"POSE1: {pose1},\n POSE2: {pose2}")
+        #     log(f"pts1: {pts1.T}, pts2: {pts2.T}")
     
         points_4d = cv2.triangulatePoints(pose1, pose2, pts1.T, pts2.T)
         points_4d = points_4d.T
 
-        log(f"Before Filter: {len(points_4d)}")
+        # log(f"Before Filter: {len(points_4d)}")
         # Filter and Divide Out W from [X, Y, Z, W]
         valid_filter = (np.abs(points_4d[:, 3]) > 0.005)
         points_4d = points_4d[valid_filter]
@@ -186,13 +186,13 @@ class SFM_Pipeline:
         reasonable_depth = (points_3d[:, 2] < 80.0) & (points_3d[:, 2] > 0.1)
         points_3d = points_3d[reasonable_depth]
 
-        log(f"After Filter: {len(points_3d)}")
+        # log(f"After Filter: {len(points_3d)}")
 
-        if DEBUG and points_3d.any():
-            log(f"Triangulated {len(points_3d)} points")
-            log(f"Z range: {points_3d[:, 2].min():.2f} to {points_3d[:, 2].max():.2f}")
-            log(f"XY range: X[{points_3d[:, 0].min():.2f}, {points_3d[:, 0].max():.2f}], "
-                f"Y[{points_3d[:, 1].min():.2f}, {points_3d[:, 1].max():.2f}]")
+        # if DEBUG and points_3d.any():
+        #     log(f"Triangulated {len(points_3d)} points")
+        #     log(f"Z range: {points_3d[:, 2].min():.2f} to {points_3d[:, 2].max():.2f}")
+        #     log(f"XY range: X[{points_3d[:, 0].min():.2f}, {points_3d[:, 0].max():.2f}], "
+        #         f"Y[{points_3d[:, 1].min():.2f}, {points_3d[:, 1].max():.2f}]")
                 
         # Return the 3D points
         return points_3d
@@ -211,40 +211,50 @@ class SFM_Pipeline:
         # Return 3D coordinates
         return world_homogeneous[:, :3]
 
-    def min_distance(self, cam_pos):
+    def min_distance(self, cam_pos, count=100):
         if len(self.world_map) > 0:
-            world_pts_array = np.array(self.world_map) # TODO: Modify to only look at points on front of the camera
-            dists = np.linalg.norm(world_pts_array - cam_pos, axis=1)
-            min_idx = np.argmin(dists)
-            min_dist = dists[min_idx]
+            world_pts_array = np.array(self.world_map[-count:])
 
-            return min_dist, min_idx
+            # Filter Only Points on Front of Camera
+            in_front_mask = world_pts_array[:, 2] > cam_pos[2]
+            valid_pts = world_pts_array[in_front_mask]
+
+            if valid_pts.any():
+                dists = np.linalg.norm(valid_pts - cam_pos, axis=1)
+                min_idx = np.argmin(dists)
+                min_dist = dists[min_idx]
+                min_pnt = valid_pts[min_idx]
+
+                return min_dist, min_pnt
   
         return float('inf'), None
     
 
-    def transform_to_local(self, cam_pos, count=100):
-        if len(self.world_map) == 0:
-            return np.array([])
+    def transform_to_local(self, camera_pose, point): 
+        # Invert Pose
+        camera_pose_inv = np.linalg.inv(camera_pose)
         
-        world_pts_array = np.array(self.world_map[-count:])
-        # Inverse Camera Pose -> World-to-Camera
-        camera_pose_inv = np.linalg.inv(cam_pos)
-
-        # Homogenous Coords
-        ones = np.ones((world_pts_array.shape[0], 1))
-        world_homogeneous = np.hstack([world_pts_array, ones])
-
+        # Convert point to homogeneous coordinates
+        point_homogeneous = np.append(point, 1)
+        
         # Transform
-        camera_homogeneous = (camera_pose_inv @ world_homogeneous.T).T
-
-        # 3D Coords
-        return camera_homogeneous[:, :3]
+        camera_homogeneous = camera_pose_inv @ point_homogeneous
+        
+        # Return 3D
+        return camera_homogeneous[:3]
 
     
-    def viz_dist_points(self, min_idx, min_dist, cur_pose, cur_frame):
+    def viz_dist_points(self, min_pnt, min_dist, cur_pose, cur_frame):
         # Get Local Points In Frame
-        cam_points = self.transform_to_local(cur_pose)
+        cam_points = []
+
+        for point in self.world_map[-50:]:
+            cam_points.append(self.transform_to_local(cur_pose, point))
+
+        cam_points = np.vstack(cam_points)
+
+        # Get Min Point
+        min_point = self.transform_to_local(cur_pose, min_pnt)
 
         # Filter Pos Z points
         in_front = cam_points[:, 2] > 0.1
@@ -259,26 +269,25 @@ class SFM_Pipeline:
             y = int(round(ret[1]))
             cv2.circle(cur_frame, (x, y), 8, (0, 255, 0), -1)
 
-        # cv2.circle(cur_frame, (x, y), 8, (0, 0, 255), -1)
-        # cv2.putText(
-        #     cur_frame,
-        #     f"{min_dist:.2f}m",
-        #     (x + 10, y - 10),
-        #     cv2.FONT_HERSHEY_SIMPLEX,
-        #     0.7,
-        #     (0, 255, 0),
-        #     2
-        # )
+        # Get Min Point
+        ret = np.dot(self.K, min_point)
+        ret /= ret[2]
 
-        # # Get Min Point
-        # if self.world_map[min_idx]
-        # ret = np.dot(self.K, camera_points_front[min_idx])
-        # ret /= ret[2]
+        x = int(round(ret[0]))
+        y = int(round(ret[1]))
 
-        # x = int(round(ret[0]))
-        # y = int(round(ret[1]))
+        cv2.circle(cur_frame, (x, y), 8, (0, 0, 255), -1)
+        cv2.putText(
+            cur_frame,
+            f"{min_dist:.2f}m",
+            (x + 10, y - 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 255, 0),
+            2
+        )
 
-        # log(f"MIN DIST: {min_dist} @ ({x}, {y})")
+        log(f"MIN DIST: {min_dist} @ ({x}, {y})")
 
 
         cv2.imshow("Closest Point Visualization", cur_frame)
