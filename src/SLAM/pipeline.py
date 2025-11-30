@@ -125,6 +125,10 @@ class SFM_Pipeline:
 
                     # Segment into Zones
                     zones = self.segment_zones(local_points, curr_pose, cur_frame)
+                    
+                    # Synthesize Audio
+                    audio_params = self.synth.obstacle_to_audio_params(zones)
+                    self.synth.play_audio_feedback(audio_params)
 
                     # Set Prev Pose
                     prev_pose = curr_pose
@@ -424,7 +428,6 @@ class SFM_Pipeline:
         zones['right'] = {'obstacle_density': len(right_zone)}
 
         return zones
-
 
  
 def log(msg):
