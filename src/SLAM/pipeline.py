@@ -70,11 +70,11 @@ class SFM_Pipeline:
                 # Calculate Pose
                 relative_pose, pts_one, pts_two = self.process_trajectory(prev_frame, cur_frame)
 
-                # Update World Pose
-                curr_pose = prev_pose @ relative_pose
-
                 # Triangulate
-                if pts_one.any() and pts_two.any():
+                if pts_one is not None and pts_two is not None and pts_one.any() and pts_two.any():
+                    # Update World Pose
+                    curr_pose = prev_pose @ relative_pose
+
                     local_pose1 = np.eye(4)
                     local_points = self.triangulate(local_pose1, relative_pose, pts_one, pts_two)
 
@@ -105,8 +105,8 @@ class SFM_Pipeline:
                         if DEBUG and min_pnt is not None and local_points.any():
                             self.viz_local_points(min_pnt, minimum, local_points, cur_frame)
 
-                # Set Prev Pose
-                prev_pose = curr_pose
+                    # Set Prev Pose
+                    prev_pose = curr_pose
 
             # Increment Frame Count
             prev_frame = cur_frame.copy()
@@ -137,6 +137,10 @@ class SFM_Pipeline:
         keypoint_one, descriptors_one = orb.detectAndCompute(frame_one, None)
         keypoint_two, descriptors_two = orb.detectAndCompute(frame_two, None)
 
+        # CHECK
+        if descriptors_one is None or descriptors_two is None:
+            return None, None, None
+
         # Match Descriptors Between Images
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         matches = bf.match(descriptors_one, descriptors_two)
@@ -150,6 +154,10 @@ class SFM_Pipeline:
         
         # Fundamental Matrix
         F, inliers = cv2.findFundamentalMat(pts_one, pts_two, cv2.FM_RANSAC)
+
+        # CHECK
+        if F is None or F.shape != (3, 3):
+            return None, None, None 
 
         # Essential Matrix
         E = self.K.T @ F @ self.K
