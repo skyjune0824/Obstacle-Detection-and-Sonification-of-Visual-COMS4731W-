@@ -65,15 +65,15 @@ class SFM_Pipeline:
                     local_pose1 = np.eye(4)
                     local_points = self.triangulate(local_pose1, relative_pose, pts_one, pts_two)
 
+                    # Find Distance to closest object in each zone.
+                    minimum, min_idx = self.min_distance(local_points)
+
+                    # Visualize
+                    if DEBUG and min_idx is not None:
+                        self.viz_dist_points(min_idx, minimum, local_points, cur_frame)
+                
                 # Update World Pose
                 curr_pose = prev_pose @ relative_pose
-
-                # Find Distance to closest object in each zone.
-                minimum, min_idx = self.min_distance(local_points)
-
-                # Visualize
-                if DEBUG and min_idx is not None:
-                    self.viz_dist_points(min_idx, minimum, local_points, cur_frame)
 
                 # Set Prev Pose
                 prev_pose = curr_pose
@@ -241,3 +241,9 @@ class SFM_Pipeline:
 def log(msg):
     if DEBUG:
         print(msg)
+
+# Notes
+# I could try and add all the points and poses to an accumulating map
+# and calculate each pose relative to the world position instead of local and see 
+# if that improved distance accuracy (Pull min distance from overall map)
+# I could also take clusters or median distances
