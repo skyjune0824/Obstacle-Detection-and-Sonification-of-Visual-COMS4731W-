@@ -285,6 +285,7 @@ class SFM_Pipeline:
         camera_pose_inv = np.linalg.inv(cam_pos)
         # Homogenous Coords
         ones = np.ones((world_pts_array.shape[0], 1))
+
         world_homogeneous = np.hstack([world_pts_array, ones])
         # Transform
         camera_homogeneous = (camera_pose_inv @ world_homogeneous.T).T
@@ -306,13 +307,13 @@ class SFM_Pipeline:
         cam_points = np.vstack(cam_points)
 
         # Get Min Point
-        min_point = self.transform_to_local(cur_pose, min_pnt)
+        min_point = self.transform_to_local(cur_pose, [min_pnt])[0]
 
         # Filter Pos Z points
         in_front = cam_points[:, 2] > 0.1
         camera_points_front = cam_points[in_front]
 
-        self.viz_local_points(self, min_point, min_dist, camera_points_front, cur_frame)
+        self.viz_local_points(min_point, min_dist, camera_points_front, cur_frame)
 
     def viz_local_points(self, min_pnt, min_dist, points, cur_frame):
         """ Visualize Local Points
