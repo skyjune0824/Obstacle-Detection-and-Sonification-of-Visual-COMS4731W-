@@ -136,15 +136,13 @@ class SFM_Pipeline:
             # Increment Frame Count
             prev_frame = cur_frame.copy()
             frame_cnt += 1
-
-
             
         # Release Video Source
         self.cap.release()
 
         log("Complete.")
 
-        return self.minimums
+        return self.audio_trace
 
     def process_trajectory(self, frame_one, frame_two):
         """ Process Trajectory
