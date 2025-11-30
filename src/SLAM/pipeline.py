@@ -34,6 +34,7 @@ class SFM_Pipeline:
         self.global_memory = glob_mem
         self.cap = None
         self.world_map = []
+        self.minimums = []
 
 
     def pipeline(self, source):
@@ -59,6 +60,10 @@ class SFM_Pipeline:
         prev_pose = np.eye(4)
         prev_frame = None
 
+        # DEBUG
+        total_distance_moved = 0.0
+
+
         # Core Pipeline Loop
         while True:
             # Read Frame While Possible
@@ -77,6 +82,18 @@ class SFM_Pipeline:
 
                     local_pose1 = np.eye(4)
                     local_points = self.triangulate(local_pose1, relative_pose, pts_one, pts_two)
+
+
+                    # DEBUG: Camera movement
+                    frame_translation = np.linalg.norm(relative_pose[:3, 3])
+                    total_distance_moved += frame_translation
+                    cam_pos = curr_pose[:3, 3]
+                    
+                    print(f"\n=== Frame {frame_cnt} ===")
+                    print(f"Camera position: [{cam_pos[0]:.3f}, {cam_pos[1]:.3f}, {cam_pos[2]:.3f}]")
+                    print(f"Frame translation: {frame_translation:.4f}m")
+                    print(f"Total distance moved: {total_distance_moved:.3f}m")
+                    print(f"Triangulated points: {len(local_points)}")
 
                     # Global Point Map Algo
                     if not self.local:
@@ -105,6 +122,14 @@ class SFM_Pipeline:
                         if DEBUG and min_pnt is not None and local_points.any():
                             self.viz_local_points(min_pnt, minimum, local_points, cur_frame)
 
+                        if min_pnt is not None:
+                            print(f"Closest local point: [{min_pnt[0]:.3f}, {min_pnt[1]:.3f}, {min_pnt[2]:.3f}]")
+                            print(f"Distance to closest: {minimum:.3f}m")
+
+                    
+                    # Record Min
+                    self.minimums.append(minimum)
+
                     # Set Prev Pose
                     prev_pose = curr_pose
 
@@ -117,8 +142,8 @@ class SFM_Pipeline:
 
         log("Complete.")
 
-        # return self.audio_trace
-    
+        return self.minimums
+
     def process_trajectory(self, frame_one, frame_two):
         """ Process Trajectory
 
@@ -169,6 +194,12 @@ class SFM_Pipeline:
         # Decompose for Rotation + Translation
         _, R, t, mask = cv2.recoverPose(E, pts_one_inliers, pts_two_inliers, self.K)
 
+        # Scale
+        fps = self.cap.get(cv2.CAP_PROP_FPS)
+        dt = 1.0 / fps
+        t = t / np.linalg.norm(t)              
+        t = t * self.cam_speed * dt           
+
         # Mask
         pts_one_masked = pts_one_inliers[mask.ravel() > 0]
         pts_two_masked = pts_two_inliers[mask.ravel() > 0]
@@ -182,11 +213,6 @@ class SFM_Pipeline:
         pose = np.eye(4)
         pose[:3, :3] = R
         pose[:3, 3] = t.ravel()
-
-        # Scale Pose to Walking Speed
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        estimated_scale_translation = self.cam_speed * (1 / fps)
-        pose[:3, 3] *= estimated_scale_translation
 
         return pose, pts_one_normed, pts_two_normed
 
@@ -215,7 +241,7 @@ class SFM_Pipeline:
         points_3d = points_4d[:, :3]
 
         # Filter Depth that is too far or behind the camera (Numerical Instability)
-        reasonable_depth = (points_3d[:, 2] < 80.0) & (points_3d[:, 2] > 0.1)
+        reasonable_depth = (points_3d[:, 2] < 80) & (points_3d[:, 2] > 0.1)
         points_3d = points_3d[reasonable_depth]
 
         # Return the 3D points
@@ -249,7 +275,8 @@ class SFM_Pipeline:
         if len(self.world_map) > 0:
             world_pts_array = np.array(self.world_map[-count:])
 
-            # Filter Only Points on Front of Camera
+            # Filter Only Points on Front of Camera - Transform to Camera Coords
+
             in_front_mask = world_pts_array[:, 2] > cam_pos[2]
             valid_pts = world_pts_array[in_front_mask]
 
@@ -336,8 +363,6 @@ class SFM_Pipeline:
         x = int(round(ret[0]))
         y = int(round(ret[1]))
 
-        log(f"MIN DIST: {min_dist} @ ({x}, {y})")
-
         # All Triangulated Positions
         for pnt in points:
             ret = np.dot(self.K, pnt)
@@ -359,7 +384,7 @@ class SFM_Pipeline:
         )
 
         cv2.imshow("Closest Point Visualization", cur_frame)
-        cv2.waitKey(10)
+        cv2.waitKey(10)        
 
  
 def log(msg):
