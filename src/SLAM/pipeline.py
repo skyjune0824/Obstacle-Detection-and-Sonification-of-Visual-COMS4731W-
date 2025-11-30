@@ -16,7 +16,7 @@ class SFM_Pipeline:
     estimating object distance for sonification.
     """
 
-    def __init__(self, K, cam_speed=1.4, local=True):
+    def __init__(self, K, cam_speed=1.4, local=True, glob_mem = 100):
         """ SFM Pipeline Constructor
 
         1. Initializes Audio Class
@@ -31,6 +31,7 @@ class SFM_Pipeline:
         self.K = K
         self.cam_speed = cam_speed
         self.local = local
+        self.global_memory = glob_mem
         self.cap = None
         self.world_map = []
 
@@ -89,8 +90,8 @@ class SFM_Pipeline:
                         minimum, min_pnt = self.min_world_distance(curr_pose[:3, 3])
 
                         # Clip World Map to Fresh Points
-                        if len(self.world_map) > 100:
-                            self.world_map = self.world_map[-100:]
+                        if len(self.world_map) > self.glob_mem:
+                            self.world_map = self.world_map[-self.glob_mem:]
 
                         # Visualize
                         if DEBUG and min_pnt is not None:
