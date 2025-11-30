@@ -90,8 +90,8 @@ class SFM_Pipeline:
                         minimum, min_pnt = self.min_world_distance(curr_pose[:3, 3])
 
                         # Clip World Map to Fresh Points
-                        if len(self.world_map) > self.glob_mem:
-                            self.world_map = self.world_map[-self.glob_mem:]
+                        if len(self.world_map) > self.global_memory:
+                            self.world_map = self.world_map[-self.global_memory:]
 
                         # Visualize
                         if DEBUG and min_pnt is not None:
@@ -357,3 +357,6 @@ class SFM_Pipeline:
 def log(msg):
     if DEBUG:
         print(msg)
+
+# Tutorial Inspiration Credit
+# https://learnopencv.com/monocular-slam-in-python/
