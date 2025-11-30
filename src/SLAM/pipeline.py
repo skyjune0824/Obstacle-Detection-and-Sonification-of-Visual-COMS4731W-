@@ -89,11 +89,11 @@ class SFM_Pipeline:
                     total_distance_moved += frame_translation
                     cam_pos = curr_pose[:3, 3]
                     
-                    print(f"\n=== Frame {frame_cnt} ===")
-                    print(f"Camera position: [{cam_pos[0]:.3f}, {cam_pos[1]:.3f}, {cam_pos[2]:.3f}]")
-                    print(f"Frame translation: {frame_translation:.4f}m")
-                    print(f"Total distance moved: {total_distance_moved:.3f}m")
-                    print(f"Triangulated points: {len(local_points)}")
+                    log(f"\n=== Frame {frame_cnt} ===")
+                    log(f"Camera position: [{cam_pos[0]:.3f}, {cam_pos[1]:.3f}, {cam_pos[2]:.3f}]")
+                    log(f"Frame translation: {frame_translation:.4f}m")
+                    log(f"Total distance moved: {total_distance_moved:.3f}m")
+                    log(f"Triangulated points: {len(local_points)}")
 
                     # Global Point Map Algo
                     if not self.local:
@@ -110,25 +110,21 @@ class SFM_Pipeline:
                         if len(self.world_map) > self.global_memory:
                             self.world_map = self.world_map[-self.global_memory:]
 
-                        # Visualize
-                        if DEBUG and min_pnt is not None:
-                            self.viz_world_points(min_pnt, minimum, curr_pose, cur_frame)
                     # Local Point Map Algo
                     else:
                         # Get Local Min Distance
                         minimum, min_pnt = self.min_local_distance(local_points)
 
-                        # Visualize
-                        if DEBUG and min_pnt is not None and local_points.any():
-                            self.viz_local_points(min_pnt, minimum, local_points, cur_frame)
-
                         if min_pnt is not None:
-                            print(f"Closest local point: [{min_pnt[0]:.3f}, {min_pnt[1]:.3f}, {min_pnt[2]:.3f}]")
-                            print(f"Distance to closest: {minimum:.3f}m")
+                            log(f"Closest local point: [{min_pnt[0]:.3f}, {min_pnt[1]:.3f}, {min_pnt[2]:.3f}]")
+                            log(f"Distance to closest: {minimum:.3f}m")
 
                     
                     # Record Min
                     self.minimums.append(minimum)
+
+                    # Segment into Zones
+                    zones = self.segment_zones(local_points, curr_pose, cur_frame)
 
                     # Set Prev Pose
                     prev_pose = curr_pose
@@ -136,6 +132,8 @@ class SFM_Pipeline:
             # Increment Frame Count
             prev_frame = cur_frame.copy()
             frame_cnt += 1
+
+
             
         # Release Video Source
         self.cap.release()
@@ -351,17 +349,12 @@ class SFM_Pipeline:
 
         self.viz_local_points(min_point, min_dist, camera_points_front, cur_frame)
 
-    def viz_local_points(self, min_pnt, min_dist, points, cur_frame):
+    def viz_local_points(self, min_pnt, min_dist, points, cur_frame, color=(0, 255, 0)):
         """ Visualize Local Points
 
         1. Converts local points to pixel coordinates.
         2. Displays points.
         """
-        ret = np.dot(self.K, min_pnt)
-        ret /= ret[2]
-
-        x = int(round(ret[0]))
-        y = int(round(ret[1]))
 
         # All Triangulated Positions
         for pnt in points:
@@ -370,21 +363,68 @@ class SFM_Pipeline:
 
             x = int(round(ret[0]))
             y = int(round(ret[1]))
-            cv2.circle(cur_frame, (x, y), 8, (0, 255, 0), -1)
+            cv2.circle(cur_frame, (x, y), 8, color, -1)
 
-        cv2.circle(cur_frame, (x, y), 8, (0, 0, 255), -1)
-        cv2.putText(
-            cur_frame,
-            f"{min_dist:.2f}m",
-            (x + 10, y - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 0),
-            2
-        )
+        if min_pnt is not None:
+            ret = np.dot(self.K, min_pnt)
+            ret /= ret[2]
+
+            x = int(round(ret[0]))
+            y = int(round(ret[1]))
+
+            cv2.circle(cur_frame, (x, y), 8, (0, 0, 255), -1)
+            cv2.putText(
+                cur_frame,
+                f"{min_dist:.2f}m",
+                (x + 10, y - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2
+            )
 
         cv2.imshow("Closest Point Visualization", cur_frame)
-        cv2.waitKey(10)        
+        cv2.waitKey(10)      
+
+    def segment_zones(self, local_points, cur_pose, cur_frame):
+        # Establish Zones
+        zones = {}
+        zone_names = ['left', 'center', 'right']
+
+        # Establish Thresholds
+        left = -np.deg2rad(15)
+        right = np.deg2rad(15)
+
+        # Transform to Camera Coordinate Frame
+        if not self.local:
+            cam_points = self.transform_to_local(cur_pose, self.world_map)
+            cam_points = np.vstack(cam_points)
+        else:
+            cam_points = local_points
+
+        # Filter out points behind camera
+        pts_front = cam_points[cam_points[:, 2] > 0]
+
+        # Get Angles Atan(x/z) 
+        angles = np.arctan2(pts_front[:, 0], pts_front[:, 2])
+
+        # Filter By Zone
+        left_zone = pts_front[angles < left]
+        center_zone = pts_front[(angles >= left) & (angles <= right)]
+        right_zone = pts_front[angles > right]
+
+        # DEBUG
+        self.viz_local_points(None, None, left_zone, cur_frame, (255, 200, 0))
+        self.viz_local_points(None, None, center_zone, cur_frame, (0, 255, 0))
+        self.viz_local_points(None, None, right_zone, cur_frame, (0, 0, 255))
+
+        # Get Density Per Zone
+        zones['left'] = {'obstacle_density': len(left_zone)}
+        zones['center'] = {'obstacle_density': len(center_zone)}
+        zones['right'] = {'obstacle_density': len(right_zone)}
+
+        return zones
+
 
  
 def log(msg):
