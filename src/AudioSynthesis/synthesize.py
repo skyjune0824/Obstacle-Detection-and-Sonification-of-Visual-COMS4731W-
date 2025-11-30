@@ -88,34 +88,64 @@ class SpatialAudioFeedback:
         MAX_VOLUME = 0.8
         
         for zone_name, zone_data in zones.items():
-            distance = zone_data['min_distance']
-            
-            if distance == float('inf'):
-                # No obstacles in this zone
+            if 'min_distance' in zone_data:
+                distance = zone_data['min_distance']
+                
+                if distance == float('inf'):
+                    # No obstacles in this zone
+                    audio_params[zone_name] = {
+                        'frequency': 0,
+                        'volume': 0,
+                        'pan': 0
+                    }
+                    continue
+                
+                # Map distance to frequency (closer = higher pitch)
+                # Inverse exponential mapping for more better feedback
+                freq = BASE_FREQ + (MAX_FREQ - BASE_FREQ) * np.exp(-distance / 2.0)
+                
+                # Map distance to volume (closer = louder)
+                volume = BASE_VOLUME + (MAX_VOLUME - BASE_VOLUME) * (1 - distance / 5.0)
+                volume = np.clip(volume, BASE_VOLUME, MAX_VOLUME)
+                
+                # Stereo panning: -1 (left) to +1 (right)
+                pan_map = {'left': -0.8, 'center': 0.0, 'right': 0.8}
+                pan = pan_map[zone_name]
+                
                 audio_params[zone_name] = {
-                    'frequency': 0,
-                    'volume': 0,
-                    'pan': 0
+                    'frequency': freq,
+                    'volume': volume,
+                    'pan': pan
                 }
-                continue
-            
-            # Map distance to frequency (closer = higher pitch)
-            # Inverse exponential mapping for more better feedback
-            freq = BASE_FREQ + (MAX_FREQ - BASE_FREQ) * np.exp(-distance / 2.0)
-            
-            # Map distance to volume (closer = louder)
-            volume = BASE_VOLUME + (MAX_VOLUME - BASE_VOLUME) * (1 - distance / 5.0)
-            volume = np.clip(volume, BASE_VOLUME, MAX_VOLUME)
-            
-            # Stereo panning: -1 (left) to +1 (right)
-            pan_map = {'left': -0.8, 'center': 0.0, 'right': 0.8}
-            pan = pan_map[zone_name]
-            
-            audio_params[zone_name] = {
-                'frequency': freq,
-                'volume': volume,
-                'pan': pan
-            }
+            elif 'obstacle_density' in zone_data:
+                density = zone_data['obstacle_density']
+
+                if density == 0:
+                    # No obstacles in this zone
+                    audio_params[zone_name] = {
+                        'frequency': 0,
+                        'volume': 0,
+                        'pan': 0
+                    }
+                    continue
+
+                # Map density to frequency (more = higher pitch)
+                # Inverse exponential mapping for more better feedback
+                freq = BASE_FREQ + (MAX_FREQ - BASE_FREQ) * (1 - np.exp(-density / 2.0))
+                
+                # Map density to volume (more = louder)
+                volume = BASE_VOLUME + (MAX_VOLUME - BASE_VOLUME) * (density / 5.0)
+                volume = np.clip(volume, BASE_VOLUME, MAX_VOLUME)
+                
+                # Stereo panning: -1 (left) to +1 (right)
+                pan_map = {'left': -0.8, 'center': 0.0, 'right': 0.8}
+                pan = pan_map[zone_name]
+                
+                audio_params[zone_name] = {
+                    'frequency': freq,
+                    'volume': volume,
+                    'pan': pan
+                }
         
         return audio_params
 
