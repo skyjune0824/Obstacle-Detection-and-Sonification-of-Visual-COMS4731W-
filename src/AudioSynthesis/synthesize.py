@@ -130,13 +130,10 @@ class SpatialAudioFeedback:
                     continue
 
                 # Map density to frequency (more = higher pitch)
-                # Inverse exponential mapping for more better feedback
-                freq = BASE_FREQ + (MAX_FREQ - BASE_FREQ) * (1 - np.exp(-density / 2.0))
-                
-                # Map density to volume (more = louder)
-                volume = BASE_VOLUME + (MAX_VOLUME - BASE_VOLUME) * (density / 5.0)
-                volume = np.clip(volume, BASE_VOLUME, MAX_VOLUME)
-                
+                # Log Scale. 
+                freq = BASE_FREQ + (MAX_FREQ - BASE_FREQ) * (np.log1p(density) / np.log1p(density + 1))
+                volume = BASE_VOLUME + (MAX_VOLUME - BASE_VOLUME) * (np.log1p(density) / np.log1p(density + 1))
+
                 # Stereo panning: -1 (left) to +1 (right)
                 pan_map = {'left': -0.8, 'center': 0.0, 'right': 0.8}
                 pan = pan_map[zone_name]

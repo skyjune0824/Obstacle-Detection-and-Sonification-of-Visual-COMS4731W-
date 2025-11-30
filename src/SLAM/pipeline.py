@@ -35,6 +35,11 @@ class SFM_Pipeline:
         self.cap = None
         self.world_map = []
         self.minimums = []
+        self.audio_trace =  {
+            'left': [],
+            'center': [],
+            'right': []
+        }
 
 
     def pipeline(self, source):
@@ -129,6 +134,9 @@ class SFM_Pipeline:
                     # Synthesize Audio
                     audio_params = self.synth.obstacle_to_audio_params(zones)
                     self.synth.play_audio_feedback(audio_params)
+
+                    if DEBUG:
+                        self.log_audio(zones, audio_params)
 
                     # Set Prev Pose
                     prev_pose = curr_pose
@@ -426,6 +434,16 @@ class SFM_Pipeline:
         zones['right'] = {'obstacle_density': len(right_zone)}
 
         return zones
+    
+    def log_audio(self, zone_params, audio_params):
+        for zone, zone_params in zone_params.items():
+            self.audio_trace[zone].append(
+                (
+                    zone_params['obstacle_density'],
+                    audio_params[zone]['frequency'],
+                    audio_params[zone]['volume']
+                )
+            )
 
  
 def log(msg):
