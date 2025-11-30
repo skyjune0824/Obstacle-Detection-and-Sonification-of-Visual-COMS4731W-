@@ -21,6 +21,7 @@ class SFM_Pipeline:
         self.sample_rate = rate
         self.cap = None
         self.K = K
+        self.world_map = []
 
 
     def pipeline(self, source):
@@ -60,20 +61,28 @@ class SFM_Pipeline:
                 # Calculate Pose
                 relative_pose, pts_one, pts_two = self.process_trajectory(prev_frame, cur_frame)
 
+                # Update World Pose
+                curr_pose = prev_pose @ relative_pose
+
                 # Triangulate
                 if pts_one.any() and pts_two.any():
                     local_pose1 = np.eye(4)
                     local_points = self.triangulate(local_pose1, relative_pose, pts_one, pts_two)
 
+                    # Convert Local Points to World Points
+                    world_points_current = self.transform_to_world(local_points, prev_pose)
+
+                    # Add to map
+                    if world_points_current.any():
+                        self.world_map.extend(world_points_current)
+                        log(f"World Map Added {len(world_points_current)}. TOTAL SIZE: {len(self.world_map)}")
+
                     # Find Distance to closest object in each zone.
-                    minimum, min_idx = self.min_distance(local_points)
+                    minimum, min_idx = self.min_distance(curr_pose[:3, 3])
 
                     # Visualize
-                    if DEBUG and min_idx is not None:
-                        self.viz_dist_points(min_idx, minimum, local_points, cur_frame)
-                
-                # Update World Pose
-                curr_pose = prev_pose @ relative_pose
+                    if DEBUG and min_idx is not None and local_points.any():
+                        self.viz_dist_points(min_idx, minimum, curr_pose, cur_frame)
 
                 # Set Prev Pose
                 prev_pose = curr_pose
@@ -187,34 +196,62 @@ class SFM_Pipeline:
                 
         # Return the 3D points
         return points_3d
+    
+    def transform_to_world(self, local_points, camera_pose):
+        if len(local_points) == 0:
+            return np.array([])
 
-    def min_distance(self, points):
-        min_dist = float('inf')
+        # Convert to homogeneous coordinates - Add Column of Ones
+        ones = np.ones((local_points.shape[0], 1))
+        local_homogeneous = np.hstack([local_points, ones])
 
-        if points.shape[0] > 0:
-            cam_pos_local = np.array([0, 0, 0])
-            dists = np.linalg.norm(points - cam_pos_local, axis=1)        
+        # Transform to world coordinates 
+        world_homogeneous = (camera_pose @ local_homogeneous.T).T
+
+        # Return 3D coordinates
+        return world_homogeneous[:, :3]
+
+    def min_distance(self, cam_pos):
+        if len(self.world_map) > 0:
+            world_pts_array = np.array(self.world_map) # TODO: Modify to only look at points on front of the camera
+            dists = np.linalg.norm(world_pts_array - cam_pos, axis=1)
             min_idx = np.argmin(dists)
             min_dist = dists[min_idx]
-        
-            if min_idx is None:
-                return min_dist, None
-            else:
-                return min_dist, min_idx
+
+            return min_dist, min_idx
   
-        return min_dist, None
+        return float('inf'), None
     
-    def viz_dist_points(self, min_idx, min_dist, points, cur_frame):
-        ret = np.dot(self.K, points[min_idx])
-        ret /= ret[2]
 
-        x = int(round(ret[0]))
-        y = int(round(ret[1]))
+    def transform_to_local(self, cam_pos, count=100):
+        if len(self.world_map) == 0:
+            return np.array([])
+        
+        world_pts_array = np.array(self.world_map[-count:])
+        # Inverse Camera Pose -> World-to-Camera
+        camera_pose_inv = np.linalg.inv(cam_pos)
 
-        log(f"MIN DIST: {min_dist} @ ({x}, {y})")
+        # Homogenous Coords
+        ones = np.ones((world_pts_array.shape[0], 1))
+        world_homogeneous = np.hstack([world_pts_array, ones])
+
+        # Transform
+        camera_homogeneous = (camera_pose_inv @ world_homogeneous.T).T
+
+        # 3D Coords
+        return camera_homogeneous[:, :3]
+
+    
+    def viz_dist_points(self, min_idx, min_dist, cur_pose, cur_frame):
+        # Get Local Points In Frame
+        cam_points = self.transform_to_local(cur_pose)
+
+        # Filter Pos Z points
+        in_front = cam_points[:, 2] > 0.1
+        camera_points_front = cam_points[in_front]
 
         # All Triangulated Positions
-        for pnt in points:
+        for pnt in camera_points_front:
             ret = np.dot(self.K, pnt)
             ret /= ret[2]
 
@@ -222,16 +259,27 @@ class SFM_Pipeline:
             y = int(round(ret[1]))
             cv2.circle(cur_frame, (x, y), 8, (0, 255, 0), -1)
 
-        cv2.circle(cur_frame, (x, y), 8, (0, 0, 255), -1)
-        cv2.putText(
-            cur_frame,
-            f"{min_dist:.2f}m",
-            (x + 10, y - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.7,
-            (0, 255, 0),
-            2
-        )
+        # cv2.circle(cur_frame, (x, y), 8, (0, 0, 255), -1)
+        # cv2.putText(
+        #     cur_frame,
+        #     f"{min_dist:.2f}m",
+        #     (x + 10, y - 10),
+        #     cv2.FONT_HERSHEY_SIMPLEX,
+        #     0.7,
+        #     (0, 255, 0),
+        #     2
+        # )
+
+        # # Get Min Point
+        # if self.world_map[min_idx]
+        # ret = np.dot(self.K, camera_points_front[min_idx])
+        # ret /= ret[2]
+
+        # x = int(round(ret[0]))
+        # y = int(round(ret[1]))
+
+        # log(f"MIN DIST: {min_dist} @ ({x}, {y})")
+
 
         cv2.imshow("Closest Point Visualization", cur_frame)
         cv2.waitKey(10)
