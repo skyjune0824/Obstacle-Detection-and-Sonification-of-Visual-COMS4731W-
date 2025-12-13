@@ -5,8 +5,10 @@ from config import DEBUG
 import cv2
 from PIL import Image
 import numpy as np
+from src.SLAM.ImageCapture import ImageFolderCapture
 
 # Modules
+import os
 from src.AudioSynthesis.synthesize import SpatialAudioFeedback
 
 class SFM_Pipeline:
@@ -40,9 +42,10 @@ class SFM_Pipeline:
             'center': [],
             'right': []
         }
+        self.poses = []
 
 
-    def pipeline(self, source):
+    def pipeline(self, source, video = False):
         """
         The following function marks the pipeline for creating a minimal point cloud
         from multiple images in motion, performing segmentation, and synthesizing spatial audio.
@@ -52,11 +55,15 @@ class SFM_Pipeline:
 
         log(f"Performing SFM on video located at: {source}")
 
-        # Open Video Path
-        self.cap = cv2.VideoCapture(source)
+        if video:
+            # Open Video Path
+            self.cap = cv2.VideoCapture(source)
 
-        if not self.cap.isOpened():
-            raise ValueError(f"Error: Could not reach video signal {source}")
+            if not self.cap.isOpened():
+                raise ValueError(f"Error: Could not reach video signal {source}")
+        else:
+            cap = ImageFolderCapture(source)
+            log("Images Loaded.")
         
         # Establish Frame Count
         frame_cnt = 0
@@ -68,13 +75,17 @@ class SFM_Pipeline:
         # DEBUG
         total_distance_moved = 0.0
 
-
         # Core Pipeline Loop
         while True:
             # Read Frame While Possible
-            ret, cur_frame = self.cap.read()
-            if not ret:
-                break
+            if video:
+                ret, cur_frame = self.cap.read()
+                if not ret:
+                    break
+            else:
+                ret, cur_frame = cap.read()
+                if not ret:
+                    break
 
             if prev_frame is not None:
                 # Calculate Pose
@@ -85,9 +96,11 @@ class SFM_Pipeline:
                     # Update World Pose
                     curr_pose = prev_pose @ relative_pose
 
+                    # Log World Pose for Testing
+                    self.poses.append(curr_pose)
+
                     local_pose1 = np.eye(4)
                     local_points = self.triangulate(local_pose1, relative_pose, pts_one, pts_two)
-
 
                     # DEBUG: Camera movement
                     frame_translation = np.linalg.norm(relative_pose[:3, 3])
@@ -150,7 +163,8 @@ class SFM_Pipeline:
 
         log("Complete.")
 
-        return self.audio_trace
+        return (self.audio_trace, self.poses)
+    
 
     def process_trajectory(self, frame_one, frame_two):
         """ Process Trajectory
@@ -203,10 +217,10 @@ class SFM_Pipeline:
         _, R, t, mask = cv2.recoverPose(E, pts_one_inliers, pts_two_inliers, self.K)
 
         # Scale
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        dt = 1.0 / fps
-        t = t / np.linalg.norm(t)              
-        t = t * self.cam_speed * dt           
+        # fps = self.cap.get(cv2.CAP_PROP_FPS)
+        # dt = 1.0 / fps
+        # t = t / np.linalg.norm(t)              
+        # t = t * self.cam_speed * dt           
 
         # Mask
         pts_one_masked = pts_one_inliers[mask.ravel() > 0]
@@ -373,7 +387,7 @@ class SFM_Pipeline:
 
             x = int(round(ret[0]))
             y = int(round(ret[1]))
-            cv2.circle(cur_frame, (x, y), 8, color, -1)
+            cv2.circle(cur_frame, (x, y), 4, color, -1)
 
         if min_pnt is not None:
             ret = np.dot(self.K, min_pnt)
@@ -444,6 +458,15 @@ class SFM_Pipeline:
                     audio_params[zone]['volume']
                 )
             )
+    
+def load_images_from_folder(folder_path):
+    images = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+    
+    images.sort(key=lambda x: int(os.path.splitext(x)[0]))
+
+    image_paths = [os.path.join(folder_path, f) for f in images]
+
+    return image_paths
 
  
 def log(msg):
