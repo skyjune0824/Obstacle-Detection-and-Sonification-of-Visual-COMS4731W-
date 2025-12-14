@@ -1,6 +1,6 @@
 /cvproject
 /.venv
-/.vscode
+.vscode/
 
 test/data/*
 
