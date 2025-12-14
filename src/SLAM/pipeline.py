@@ -11,7 +11,7 @@ from src.SLAM.ImageCapture import ImageFolderCapture
 import os
 from src.AudioSynthesis.synthesize import SpatialAudioFeedback
 
-class SFM_Pipeline:
+class SLAM_Pipeline:
     """ Structure From Motion Pipeline
 
     Takes video, sampling key frames, to perform sparse structure from motion for
@@ -43,6 +43,8 @@ class SFM_Pipeline:
             'right': []
         }
         self.poses = []
+        self.pnt_pixels = []
+        self.mses = []
 
 
     def pipeline(self, source, video = False):
@@ -62,7 +64,7 @@ class SFM_Pipeline:
             if not self.cap.isOpened():
                 raise ValueError(f"Error: Could not reach video signal {source}")
         else:
-            cap = ImageFolderCapture(source)
+            self.cap = ImageFolderCapture(source)
             log("Images Loaded.")
         
         # Establish Frame Count
@@ -83,7 +85,7 @@ class SFM_Pipeline:
                 if not ret:
                     break
             else:
-                ret, cur_frame = cap.read()
+                ret, cur_frame = self.cap.read()
                 if not ret:
                     break
 
@@ -143,6 +145,9 @@ class SFM_Pipeline:
 
                     # Segment into Zones
                     zones = self.segment_zones(local_points, curr_pose, cur_frame)
+
+                    # Re-projection Error 
+                    self.compute_reprojection_error(local_points, self.pnt_pixels, curr_pose)
                     
                     # Synthesize Audio
                     audio_params = self.synth.obstacle_to_audio_params(zones)
@@ -163,7 +168,7 @@ class SFM_Pipeline:
 
         log("Complete.")
 
-        return (self.audio_trace, self.poses)
+        return (self.audio_trace, self.poses, self.mses)
     
 
     def process_trajectory(self, frame_one, frame_two):
@@ -216,27 +221,19 @@ class SFM_Pipeline:
         # Decompose for Rotation + Translation
         _, R, t, mask = cv2.recoverPose(E, pts_one_inliers, pts_two_inliers, self.K)
 
-        # Scale
-        # fps = self.cap.get(cv2.CAP_PROP_FPS)
-        # dt = 1.0 / fps
-        # t = t / np.linalg.norm(t)              
-        # t = t * self.cam_speed * dt           
-
         # Mask
         pts_one_masked = pts_one_inliers[mask.ravel() > 0]
         pts_two_masked = pts_two_inliers[mask.ravel() > 0]
 
-        # Normalize Inliners
-        k_inv = np.linalg.inv(self.K)
-        pts_one_normed = np.dot(k_inv, np.hstack([pts_one_masked, np.ones((pts_one_masked.shape[0], 1))]).T).T[:, 0:2]
-        pts_two_normed = np.dot(k_inv, np.hstack([pts_two_masked, np.ones((pts_two_masked.shape[0], 1))]).T).T[:, 0:2]
+        # Store For Reprojection Analysis
+        self.pnt_pixels = pts_one_masked
 
         # Construct Pose Matrix
         pose = np.eye(4)
         pose[:3, :3] = R
         pose[:3, 3] = t.ravel()
 
-        return pose, pts_one_normed, pts_two_normed
+        return pose, pts_one_masked, pts_two_masked
 
 
     def triangulate(self, pose1, pose2, pts1, pts2):  
@@ -251,6 +248,11 @@ class SFM_Pipeline:
         # Invert camera poses to convert World Points to Camera Points
         pose1 = pose1[:3, :]
         pose2 = pose2[:3, :]
+
+        # Normalize Inliners
+        k_inv = np.linalg.inv(self.K)
+        pts1 = np.dot(k_inv, np.hstack([pts1, np.ones((pts1.shape[0], 1))]).T).T[:, 0:2]
+        pts2 = np.dot(k_inv, np.hstack([pts2, np.ones((pts2.shape[0], 1))]).T).T[:, 0:2]
     
         points_4d = cv2.triangulatePoints(pose1, pose2, pts1.T, pts2.T)
         points_4d = points_4d.T
@@ -438,9 +440,10 @@ class SFM_Pipeline:
         right_zone = pts_front[angles > right]
 
         # DEBUG
-        self.viz_local_points(None, None, left_zone, cur_frame, (255, 200, 0))
-        self.viz_local_points(None, None, center_zone, cur_frame, (0, 255, 0))
-        self.viz_local_points(None, None, right_zone, cur_frame, (0, 0, 255))
+        if DEBUG:
+            self.viz_local_points(None, None, left_zone, cur_frame, (255, 200, 0))
+            self.viz_local_points(None, None, center_zone, cur_frame, (0, 255, 0))
+            self.viz_local_points(None, None, right_zone, cur_frame, (0, 0, 255))
 
         # Get Density Per Zone
         zones['left'] = {'obstacle_density': len(left_zone)}
@@ -458,6 +461,32 @@ class SFM_Pipeline:
                     audio_params[zone]['volume']
                 )
             )
+
+    def compute_reprojection_error(self, local_points, img_points, curr_pose):
+        if len(local_points) > 0 and len(img_points) > 0:
+            # Transform to Camera Coordinate Frame
+            if not self.local:
+                cam_points = self.transform_to_local(curr_pose, self.world_map)
+                cam_points = np.vstack(cam_points)
+            else:
+                cam_points = local_points
+            
+                
+            # Project
+            projected = []
+
+            for pnt in cam_points:
+                ret = np.dot(self.K, pnt)
+                ret /= ret[2]
+
+                x = int(round(ret[0]))
+                y = int(round(ret[1]))
+                projected.append([x, y])
+
+            # MSE
+            mse = (np.linalg.norm(projected - img_points[:len(projected)], axis=1)).mean()
+            self.mses.append(mse)
+        
     
 def load_images_from_folder(folder_path):
     images = [f for f in os.listdir(folder_path) if f.endswith('.png')]
