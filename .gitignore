@@ -1,6 +1,7 @@
 /cvproject
-/data
-/test
+/.venv
+
+test/data/*
+
 *.pyc
 __pycache__
-/test/data/.*
