@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ENV_NAME="cvproject"
-DEP_LIST="dependencies.txt"
+DEP_LIST="requirements.txt"
 
-PYTHON_CMD="python3"
+PYTHON_CMD="python"
 
 echo "ENV '$ENV_NAME' creating..."
 $PYTHON_CMD -m venv $ENV_NAME
