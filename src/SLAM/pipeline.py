@@ -1,0 +1,506 @@
+# Debug Setting
+from config import DEBUG
+
+# Video Processing
+import cv2
+from PIL import Image
+import numpy as np
+from src.SLAM.ImageCapture import ImageFolderCapture
+
+# Modules
+import os
+from src.AudioSynthesis.synthesize import SpatialAudioFeedback
+
+class SLAM_Pipeline:
+    """ Structure From Motion Pipeline
+
+    Takes video, sampling key frames, to perform sparse structure from motion for
+    estimating object distance for sonification.
+    """
+
+    def __init__(self, K, cam_speed=1.4, local=True, glob_mem = 100):
+        """ SFM Pipeline Constructor
+
+        1. Initializes Audio Class
+        2. Sets Camera Intrinsics  
+        3. Sets Camera Speed. We default to average walking speed.
+        4. Switch between Local and Global for Local (Faster, Sparse) Versus Global (Slower, Dense) Point Maps
+        5. Initialize CV Capture
+        6. Initialize World Map 
+        """
+
+        self.synth = SpatialAudioFeedback()
+        self.K = K
+        self.cam_speed = cam_speed
+        self.local = local
+        self.global_memory = glob_mem
+        self.cap = None
+        self.world_map = []
+        self.minimums = []
+        self.audio_trace =  {
+            'left': [],
+            'center': [],
+            'right': []
+        }
+        self.poses = []
+        self.pnt_pixels = []
+        self.mses = []
+
+
+    def pipeline(self, source, video = False):
+        """
+        The following function marks the pipeline for creating a minimal point cloud
+        from multiple images in motion, performing segmentation, and synthesizing spatial audio.
+
+        Source: Path to video we desire to perform our pipeline on.
+        """
+
+        log(f"Performing SFM on video located at: {source}")
+
+        if video:
+            # Open Video Path
+            self.cap = cv2.VideoCapture(source)
+
+            if not self.cap.isOpened():
+                raise ValueError(f"Error: Could not reach video signal {source}")
+        else:
+            self.cap = ImageFolderCapture(source)
+            log("Images Loaded.")
+        
+        # Establish Frame Count
+        frame_cnt = 0
+
+        # Initial Pose
+        prev_pose = np.eye(4)
+        prev_frame = None
+
+        # DEBUG
+        total_distance_moved = 0.0
+
+        # Core Pipeline Loop
+        while True:
+            # Read Frame While Possible
+            if video:
+                ret, cur_frame = self.cap.read()
+                if not ret:
+                    break
+            else:
+                ret, cur_frame = self.cap.read()
+                if not ret:
+                    break
+
+            if prev_frame is not None:
+                # Calculate Pose
+                relative_pose, pts_one, pts_two = self.process_trajectory(prev_frame, cur_frame)
+
+                # Triangulate
+                if pts_one is not None and pts_two is not None and pts_one.any() and pts_two.any():
+                    # Update World Pose
+                    curr_pose = prev_pose @ relative_pose
+
+                    # Log World Pose for Testing
+                    self.poses.append(curr_pose)
+
+                    local_pose1 = np.eye(4)
+                    local_points = self.triangulate(local_pose1, relative_pose, pts_one, pts_two)
+
+                    # DEBUG: Camera movement
+                    frame_translation = np.linalg.norm(relative_pose[:3, 3])
+                    total_distance_moved += frame_translation
+                    cam_pos = curr_pose[:3, 3]
+                    
+                    log(f"\n=== Frame {frame_cnt} ===")
+                    log(f"Camera position: [{cam_pos[0]:.3f}, {cam_pos[1]:.3f}, {cam_pos[2]:.3f}]")
+                    log(f"Frame translation: {frame_translation:.4f}m")
+                    log(f"Total distance moved: {total_distance_moved:.3f}m")
+                    log(f"Triangulated points: {len(local_points)}")
+
+                    # Global Point Map Algo
+                    if not self.local:
+                        # Transform Local Points to World Coordinates
+                        world_points_current = self.transform_to_world(local_points, prev_pose)
+
+                        # Add to World Map
+                        self.world_map.extend(world_points_current)
+
+                        # Find Distance to Closest Point in World Coordinates.
+                        minimum, min_pnt = self.min_world_distance(curr_pose[:3, 3])
+
+                        # Clip World Map to Fresh Points
+                        if len(self.world_map) > self.global_memory:
+                            self.world_map = self.world_map[-self.global_memory:]
+
+                    # Local Point Map Algo
+                    else:
+                        # Get Local Min Distance
+                        minimum, min_pnt = self.min_local_distance(local_points)
+
+                        if min_pnt is not None:
+                            log(f"Closest local point: [{min_pnt[0]:.3f}, {min_pnt[1]:.3f}, {min_pnt[2]:.3f}]")
+                            log(f"Distance to closest: {minimum:.3f}m")
+
+                    
+                    # Record Min
+                    self.minimums.append(minimum)
+
+                    # Segment into Zones
+                    zones = self.segment_zones(local_points, curr_pose, cur_frame)
+
+                    # Re-projection Error 
+                    self.compute_reprojection_error(local_points, self.pnt_pixels, curr_pose)
+                    
+                    # Synthesize Audio
+                    audio_params = self.synth.obstacle_to_audio_params(zones)
+                    self.synth.play_audio_feedback(audio_params)
+
+                    if DEBUG:
+                        self.log_audio(zones, audio_params)
+
+                    # Set Prev Pose
+                    prev_pose = curr_pose
+
+            # Increment Frame Count
+            prev_frame = cur_frame.copy()
+            frame_cnt += 1
+            
+        # Release Video Source
+        self.cap.release()
+
+        log("Complete.")
+
+        return (self.audio_trace, self.poses, self.mses)
+    
+
+    def process_trajectory(self, frame_one, frame_two):
+        """ Process Trajectory
+
+        1. Get Orb Features
+        2. Determine Best Matches
+        3. Calculate Essential Matrix 
+        4. Filter Outliers
+        5. Normalize Points and Construct Pose
+        6. Scale Pose to Camera Speed
+        """
+
+        # Extract ORB Features
+        orb = cv2.ORB_create(nfeatures=5000)
+
+        # Get Key Points Between Images
+        keypoint_one, descriptors_one = orb.detectAndCompute(frame_one, None)
+        keypoint_two, descriptors_two = orb.detectAndCompute(frame_two, None)
+
+        # CHECK
+        if descriptors_one is None or descriptors_two is None:
+            return None, None, None
+
+        # Match Descriptors Between Images
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        matches = bf.match(descriptors_one, descriptors_two)
+
+        # Sort Matches
+        matches = sorted(matches, key=lambda x: x.distance)
+
+        # Match Points
+        pts_one = np.float32([keypoint_one[m.queryIdx].pt for m in matches])
+        pts_two = np.float32([keypoint_two[m.trainIdx].pt for m in matches])
+        
+        # Fundamental Matrix
+        F, inliers = cv2.findFundamentalMat(pts_one, pts_two, cv2.FM_RANSAC)
+
+        # CHECK
+        if F is None or F.shape != (3, 3):
+            return None, None, None 
+
+        # Essential Matrix
+        E = self.K.T @ F @ self.K
+
+        # Get Points for Inliner Matches
+        pts_one_inliers = pts_one[inliers.ravel() == 1]
+        pts_two_inliers = pts_two[inliers.ravel() == 1]
+
+        # Decompose for Rotation + Translation
+        _, R, t, mask = cv2.recoverPose(E, pts_one_inliers, pts_two_inliers, self.K)
+
+        # Mask
+        pts_one_masked = pts_one_inliers[mask.ravel() > 0]
+        pts_two_masked = pts_two_inliers[mask.ravel() > 0]
+
+        # Store For Reprojection Analysis
+        self.pnt_pixels = pts_one_masked
+
+        # Construct Pose Matrix
+        pose = np.eye(4)
+        pose[:3, :3] = R
+        pose[:3, 3] = t.ravel()
+
+        return pose, pts_one_masked, pts_two_masked
+
+
+    def triangulate(self, pose1, pose2, pts1, pts2):  
+        """ Triangulate
+
+        1. Utilizes current and previous pose as well as current and previous points to perform
+        triangulation via epipolar geometry.
+        2. Filters out invalid points.
+        3. Transforms from homogenous to 3D.
+        """  
+
+        # Invert camera poses to convert World Points to Camera Points
+        pose1 = pose1[:3, :]
+        pose2 = pose2[:3, :]
+
+        # Normalize Inliners
+        k_inv = np.linalg.inv(self.K)
+        pts1 = np.dot(k_inv, np.hstack([pts1, np.ones((pts1.shape[0], 1))]).T).T[:, 0:2]
+        pts2 = np.dot(k_inv, np.hstack([pts2, np.ones((pts2.shape[0], 1))]).T).T[:, 0:2]
+    
+        points_4d = cv2.triangulatePoints(pose1, pose2, pts1.T, pts2.T)
+        points_4d = points_4d.T
+
+        # Filter and Divide Out W from [X, Y, Z, W]
+        valid_filter = (np.abs(points_4d[:, 3]) > 0.005)
+        points_4d = points_4d[valid_filter]
+
+        points_4d /= points_4d[:, 3:]
+        points_3d = points_4d[:, :3]
+
+        # Filter Depth that is too far or behind the camera (Numerical Instability)
+        reasonable_depth = (points_3d[:, 2] < 80) & (points_3d[:, 2] > 0.1)
+        points_3d = points_3d[reasonable_depth]
+
+        # Return the 3D points
+        return points_3d
+    
+    def transform_to_world(self, local_points, camera_pose):
+        """ Transform To World
+
+        1. Transforms Local Points to World Coordinates
+        """
+
+        if len(local_points) == 0:
+            return np.array([])
+
+        # Convert to homogeneous coordinates - Add Column of Ones
+        ones = np.ones((local_points.shape[0], 1))
+        local_homogeneous = np.hstack([local_points, ones])
+
+        # Transform to world coordinates 
+        world_homogeneous = (camera_pose @ local_homogeneous.T).T
+
+        # Return 3D coordinates
+        return world_homogeneous[:, :3]
+
+    def min_world_distance(self, cam_pos, count=100):
+        """ Min World Distance
+        
+        1. Finds minimum position on front of camera in world point map.
+        2. Returns that distance and the point coordinates.
+        """
+        if len(self.world_map) > 0:
+            world_pts_array = np.array(self.world_map[-count:])
+
+            # Filter Only Points on Front of Camera - Transform to Camera Coords
+
+            in_front_mask = world_pts_array[:, 2] > cam_pos[2]
+            valid_pts = world_pts_array[in_front_mask]
+
+            if valid_pts.any():
+                dists = np.linalg.norm(valid_pts - cam_pos, axis=1)
+                min_idx = np.argmin(dists)
+                min_dist = dists[min_idx]
+                min_pnt = valid_pts[min_idx]
+
+                return min_dist, min_pnt
+  
+        return float('inf'), None
+    
+    def min_local_distance(self, points):
+        """ Min Local Distance
+        
+        1. Finds minimum position in local point map.
+        2. Returns minimum position distance and point coordinates.
+        """
+        if points.shape[0] > 0:
+            cam_pos_local = np.array([0, 0, 0])
+            dists = np.linalg.norm(points - cam_pos_local, axis=1)        
+            min_idx = np.argmin(dists)
+            min_dist = dists[min_idx]
+            min_pnt = points[min_idx]
+
+            return min_dist, min_pnt
+
+        return float('inf'), None
+    
+
+    def transform_to_local(self, cam_pos, points):
+        """ Transform to Local
+
+        1. Converts set of World Points to Local Points
+        """
+        if len(points) == 0:
+            return np.array([])
+        
+        world_pts_array = np.array(points)
+        # Inverse Camera Pose -> World-to-Camera
+        camera_pose_inv = np.linalg.inv(cam_pos)
+        # Homogenous Coords
+        ones = np.ones((world_pts_array.shape[0], 1))
+
+        world_homogeneous = np.hstack([world_pts_array, ones])
+        # Transform
+        camera_homogeneous = (camera_pose_inv @ world_homogeneous.T).T
+
+        # 3D Coords
+        return camera_homogeneous[:, :3]
+
+    
+    def viz_world_points(self, min_pnt, min_dist, cur_pose, cur_frame):
+        """ Visualize World Points
+
+        1. Transforms World Points to Local Points. 
+        2. Transforms Minimum Point to Local Point.
+        3. Calls Local Visualization.
+        """
+        # Get Local Points In Frame
+        cam_points = self.transform_to_local(cur_pose, self.world_map)
+
+        cam_points = np.vstack(cam_points)
+
+        # Get Min Point
+        min_point = self.transform_to_local(cur_pose, [min_pnt])[0]
+
+        # Filter Pos Z points
+        in_front = cam_points[:, 2] > 0.1
+        camera_points_front = cam_points[in_front]
+
+        self.viz_local_points(min_point, min_dist, camera_points_front, cur_frame)
+
+    def viz_local_points(self, min_pnt, min_dist, points, cur_frame, color=(0, 255, 0)):
+        """ Visualize Local Points
+
+        1. Converts local points to pixel coordinates.
+        2. Displays points.
+        """
+
+        # All Triangulated Positions
+        for pnt in points:
+            ret = np.dot(self.K, pnt)
+            ret /= ret[2]
+
+            x = int(round(ret[0]))
+            y = int(round(ret[1]))
+            cv2.circle(cur_frame, (x, y), 4, color, -1)
+
+        if min_pnt is not None:
+            ret = np.dot(self.K, min_pnt)
+            ret /= ret[2]
+
+            x = int(round(ret[0]))
+            y = int(round(ret[1]))
+
+            cv2.circle(cur_frame, (x, y), 8, (0, 0, 255), -1)
+            cv2.putText(
+                cur_frame,
+                f"{min_dist:.2f}m",
+                (x + 10, y - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2
+            )
+
+        cv2.imshow("Closest Point Visualization", cur_frame)
+        cv2.waitKey(10)      
+
+    def segment_zones(self, local_points, cur_pose, cur_frame):
+        # Establish Zones
+        zones = {}
+        zone_names = ['left', 'center', 'right']
+
+        # Establish Thresholds
+        left = -np.deg2rad(15)
+        right = np.deg2rad(15)
+
+        # Transform to Camera Coordinate Frame
+        if not self.local:
+            cam_points = self.transform_to_local(cur_pose, self.world_map)
+            cam_points = np.vstack(cam_points)
+        else:
+            cam_points = local_points
+
+        # Filter out points behind camera
+        pts_front = cam_points[cam_points[:, 2] > 0]
+
+        # Get Angles Atan(x/z) 
+        angles = np.arctan2(pts_front[:, 0], pts_front[:, 2])
+
+        # Filter By Zone
+        left_zone = pts_front[angles < left]
+        center_zone = pts_front[(angles >= left) & (angles <= right)]
+        right_zone = pts_front[angles > right]
+
+        # DEBUG
+        if DEBUG:
+            self.viz_local_points(None, None, left_zone, cur_frame, (255, 200, 0))
+            self.viz_local_points(None, None, center_zone, cur_frame, (0, 255, 0))
+            self.viz_local_points(None, None, right_zone, cur_frame, (0, 0, 255))
+
+        # Get Density Per Zone
+        zones['left'] = {'obstacle_density': len(left_zone)}
+        zones['center'] = {'obstacle_density': len(center_zone)}
+        zones['right'] = {'obstacle_density': len(right_zone)}
+
+        return zones
+    
+    def log_audio(self, zone_params, audio_params):
+        for zone, zone_params in zone_params.items():
+            self.audio_trace[zone].append(
+                (
+                    zone_params['obstacle_density'],
+                    audio_params[zone]['frequency'],
+                    audio_params[zone]['volume']
+                )
+            )
+
+    def compute_reprojection_error(self, local_points, img_points, curr_pose):
+        if len(local_points) > 0 and len(img_points) > 0:
+            # Transform to Camera Coordinate Frame
+            if not self.local:
+                cam_points = self.transform_to_local(curr_pose, self.world_map)
+                cam_points = np.vstack(cam_points)
+            else:
+                cam_points = local_points
+            
+                
+            # Project
+            projected = []
+
+            for pnt in cam_points:
+                ret = np.dot(self.K, pnt)
+                ret /= ret[2]
+
+                x = int(round(ret[0]))
+                y = int(round(ret[1]))
+                projected.append([x, y])
+
+            # MSE
+            mse = (np.linalg.norm(projected - img_points[:len(projected)], axis=1)).mean()
+            self.mses.append(mse)
+        
+    
+def load_images_from_folder(folder_path):
+    images = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+    
+    images.sort(key=lambda x: int(os.path.splitext(x)[0]))
+
+    image_paths = [os.path.join(folder_path, f) for f in images]
+
+    return image_paths
+
+ 
+def log(msg):
+    if DEBUG:
+        print(msg)
+
+# Tutorial Inspiration Credit
+# https://learnopencv.com/monocular-slam-in-python/
