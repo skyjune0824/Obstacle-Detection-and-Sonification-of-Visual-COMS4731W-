@@ -3,3 +3,4 @@
 /test
 *.pyc
 __pycache__
+/object_classification/demo_output
