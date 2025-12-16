@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ENV_NAME="cvproject"
-DEP_LIST="dependencies.txt"
+DEP_LIST="requirements.txt"
 
 PYTHON_CMD="python"
 
