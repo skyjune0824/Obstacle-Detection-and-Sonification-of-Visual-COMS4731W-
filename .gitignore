@@ -1,6 +1,12 @@
 /cvproject
-/data
-/test
+/.venv
+.vscode/
+
+test/data/*
+
 *.pyc
 __pycache__
+<<<<<<< HEAD
 /object_classification/demo_output
+=======
+>>>>>>> 603e36eedfc346a32c6c05205fb4855a8e6ca5d3

@@ -1,9 +1,0 @@
-kaggle
-kagglehub
-numpy 
-matplotlib
-h5py
-pandas
-opencv-python
-transformers
-torch

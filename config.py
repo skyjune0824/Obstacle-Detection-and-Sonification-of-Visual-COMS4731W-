@@ -16,3 +16,4 @@ KAGGLE_DATASET_HANDLE = "artemmmtry/nyu-depth-v2"  # currently not working try: 
 ##################### KEY #####################
 RGB_KEY = 'rgb'
 DEPTH_KEY = 'depth'
+DEBUG = True
