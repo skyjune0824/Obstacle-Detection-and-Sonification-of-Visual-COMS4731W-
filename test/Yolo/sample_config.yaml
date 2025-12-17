@@ -1,0 +1,19 @@
+
+yolo_weights: "runs/detect/yolov8n_coco_exp_01/weights/best.pt"  # or "yolov8n.pt"
+
+input:
+  source: "webcam"        # "webcam" or "video"
+  video_path: "data/demo/demo.mp4"  # used if source == "video"
+
+depth:
+  mode: "simulated"       # "simulated" or "device" or "file"
+  max_depth_m: 5.0        # range for simulated depth
+
+tts:
+  enabled: true
+  rate: 180
+  volume: 1.0
+  voice_hint: null        # e.g. "female" or "en-US" if you want
+
+debug:
+  print_every_n_frames: 30
